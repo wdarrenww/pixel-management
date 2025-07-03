@@ -103,6 +103,17 @@ DESIGN_CATEGORY_IDS = [
     1380555774429888644   # ELS
 ]
 
+# Designer role pings for different services
+DESIGNER_ROLE_PINGS = {
+    "Clothing Design": 1362585427093229718,  # clothing
+    "Livery": 1362585427135168644,           # livery
+    "Banner and Graphics": 1362585427093229717,  # graphic
+    "Logo Design": 1362585427093229717,      # graphic (same as banner and graphics)
+    "Full Discord Server Design": 1362585427093229716,  # discord servers/layouts
+    "Professional Photography": 1379672017711661066,  # photography
+    "ELS": 1362585427093229715               # els
+}
+
 class ServiceSelectionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
@@ -192,7 +203,7 @@ class ServiceSelect(discord.ui.Select):
                     f"• Contact our team for custom arrangements\n\n"
                     f"Thank you for your understanding! 🙏"
                 ),
-                color=0xFF6B6B,
+                color=0x8E6B6B,
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text=".pixel Design Services • We'll be back soon!")
@@ -242,7 +253,7 @@ class ServiceSelect(discord.ui.Select):
         )
         await self.send_welcome_message(ticket_channel, user, service_type)
         await interaction.response.send_message(
-            f"our {service_type} ticket has been created: {ticket_channel.mention}!",
+            f"Your {service_type} ticket has been created: {ticket_channel.mention}!",
             ephemeral=True
         )
 
@@ -257,6 +268,15 @@ class ServiceSelect(discord.ui.Select):
             "Professional Photography": "https://media.discordapp.net/attachments/1103870377211465818/1390404846238044262/pixelphotos.png?ex=686822eb&is=6866d16b&hm=5fbdd76fe7dad1d586572a80362f61488a670be7301b9681ddfb0651d5fcaddc&=&format=webp&quality=lossless&width=2050&height=684"
         }
         banner_url = banner_urls.get(service_type, "https://example.com/default_banner.png")
+        
+        # Get designer role ping
+        designer_role_id = DESIGNER_ROLE_PINGS.get(service_type)
+        designer_role_mention = ""
+        if designer_role_id:
+            designer_role = channel.guild.get_role(designer_role_id)
+            if designer_role:
+                designer_role_mention = designer_role.mention
+        
         embed = discord.Embed(
             title=f"Welcome to your custom {service_type} order ticket!",
             description=(
@@ -273,7 +293,7 @@ class ServiceSelect(discord.ui.Select):
             color=0x1B75BD,
             timestamp=datetime.utcnow()
         )
-        embed.set_footer(text=".pixel Design Services • Professional Quality")
+        embed.set_footer(text=f".pixel Design Services • Professional Quality • Ticket ID: {channel.id}")
         
         # Add banner as embed image if available
         if banner_url != "https://example.com/default_banner.png":
@@ -281,6 +301,15 @@ class ServiceSelect(discord.ui.Select):
         
         # Create ticket management view
         ticket_view = TicketManagementView()
+        
+        # Send pings first
+        ping_message = f"Hey {user.mention}"
+        if designer_role_mention:
+            ping_message += f", {designer_role_mention} will be with you soon!"
+        else:
+            ping_message += ", our team will be with you soon!"
+        
+        await channel.send(ping_message)
         
         # Send embed with banner and management buttons
         await channel.send(embed=embed, view=ticket_view)
@@ -296,7 +325,7 @@ class ServiceSelect(discord.ui.Select):
                 embed = discord.Embed(
                     title="🎫 New Ticket Created",
                     description=f"A new ticket has been created for {service_type}",
-                    color=0x00FF00,
+                    color=0x6B8E6B,
                     timestamp=datetime.utcnow()
                 )
                 embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
@@ -335,7 +364,7 @@ class TicketManagementView(discord.ui.View):
             embed = discord.Embed(
                 title="Ticket Claimed Successfully!",
                 description=f"{interaction.user.mention} has claimed this ticket!",
-                color=0x00FF00,
+                color=0x6B8E6B,
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text=".pixel Design Services")
@@ -364,7 +393,7 @@ class TicketManagementView(discord.ui.View):
         embed = discord.Embed(
             title="⚠️ Confirm Ticket Closure",
             description="Are you sure you want to close this ticket? This action cannot be undone.",
-            color=0xFF6B6B,
+            color=0x8E6B6B,
             timestamp=datetime.utcnow()
         )
         embed.set_footer(text="Click 'Confirm Close' to proceed")
@@ -378,7 +407,7 @@ class TicketManagementView(discord.ui.View):
                 embed = discord.Embed(
                     title="🎯 Ticket Claimed",
                     description=f"A ticket has been claimed by a team member",
-                    color=0x00FF00,
+                    color=0x6B8E6B,
                     timestamp=datetime.utcnow()
                 )
                 embed.add_field(name="Claimed By", value=f"{user.mention} ({user.name})", inline=True)
@@ -405,7 +434,7 @@ class CloseConfirmationView(discord.ui.View):
         embed = discord.Embed(
             title="🔒 Ticket Closing",
             description="This ticket will be closed in 10 seconds...",
-            color=0xFF6B6B,
+            color=0x8E6B6B,
             timestamp=datetime.utcnow()
         )
         embed.set_footer(text=".pixel Design Services")
@@ -429,7 +458,7 @@ class CloseConfirmationView(discord.ui.View):
                 embed = discord.Embed(
                     title="🔒 Ticket Closed",
                     description=f"A ticket has been closed by a team member",
-                    color=0xFF6B6B,
+                    color=0x8E6B6B,
                     timestamp=datetime.utcnow()
                 )
                 embed.add_field(name="Closed By", value=f"{user.mention} ({user.name})", inline=True)
@@ -477,7 +506,7 @@ class TicketOrderView(discord.ui.View):
                     f"• Follow our status updates for reopening announcements\n\n"
                     f"Thank you for your understanding! 🙏"
                 ),
-                color=0xFF6B6B,
+                color=0x8E6B6B,
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text=".pixel Design Services • We'll be back soon!")
@@ -832,7 +861,7 @@ async def update_order_status(ctx, *, args: str):
             f"**New Status:** {status.title()}\n\n"
             f"The order embed has been updated to reflect this change."
         ),
-        color=0x00FF00,
+        color=0x6B8E6B,
         timestamp=datetime.utcnow()
     )
     embed.set_footer(text=".pixel Design Services • Status Management")
@@ -919,7 +948,7 @@ async def update_order_status(ctx, *, args: str):
                     f"**Error:** {str(e)}\n\n"
                     f"The status has been updated in the system, but the display may not reflect the change."
                 ),
-                color=0xFF6B6B,
+                color=0x8E6B6B,
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text=".pixel Design Services • Status Management")
@@ -1107,7 +1136,7 @@ async def slash_update_order_status(interaction: discord.Interaction, service: s
             f"**New Status:** {status.title()}\n\n"
             f"The order embed has been updated to reflect this change."
         ),
-        color=0x00FF00,
+        color=0x6B8E6B,
         timestamp=datetime.utcnow()
     )
     embed.set_footer(text=".pixel Design Services • Status Management")
@@ -1194,7 +1223,7 @@ async def slash_update_order_status(interaction: discord.Interaction, service: s
                     f"**Error:** {str(e)}\n\n"
                     f"The status has been updated in the system, but the display may not reflect the change."
                 ),
-                color=0xFF6B6B,
+                color=0x8E6B6B,
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text=".pixel Design Services • Status Management")
@@ -1486,7 +1515,7 @@ async def order_start_prefix(ctx, designer: discord.Member, customer: discord.Me
             f"• Your designer will begin working on your project\n"
             f"• You'll receive progress updates and previews\n"
             f"• Final delivery will be provided within the estimated timeframe\n\n"
-            f"Thank you for choosing .pixel! We're committed to delivering exceptional quality. ✨"
+            f"Thank you for choosing .pixel! We're committed to delivering exceptional quality."
         ),
         color=0x00FF00,
         timestamp=datetime.utcnow()
@@ -1557,7 +1586,7 @@ async def sync_commands(ctx):
         embed = discord.Embed(
             title="✅ - Commands Synced Successfully",
             description=f"Successfully synced {len(synced)} command(s) to {guild.name}",
-            color=0x00FF00,
+            color=0x6B8E6B,
             timestamp=datetime.utcnow()
         )
         embed.add_field(name="Synced Commands", value="\n".join([f"• /{cmd.name}" for cmd in synced]), inline=False)
@@ -1570,7 +1599,7 @@ async def sync_commands(ctx):
         embed = discord.Embed(
             title="❌ Sync Failed",
             description=f"Failed to sync commands: {str(e)}",
-            color=0xFF6B6B,
+            color=0x8E6B6B,
             timestamp=datetime.utcnow()
         )
         embed.set_footer(text=".pixel Design Services • Command Sync")
@@ -1636,7 +1665,7 @@ async def close_ticket(ctx):
     embed = discord.Embed(
         title="Ticket Closing",
         description="This ticket will be closed in 10 seconds...",
-        color=0xFF6B6B,
+        color=0x8E6B6B,
         timestamp=datetime.utcnow()
     )
     await ctx.send(embed=embed)
@@ -1780,7 +1809,7 @@ async def payment_log(interaction: discord.Interaction):
     embed = discord.Embed(
         title="💰 Payment Log",
         description="Order completed - payment information logged",
-        color=0x00FF00,
+        color=0x6B8E6B,
         timestamp=datetime.utcnow()
     )
     
@@ -1833,7 +1862,7 @@ async def payment_log_prefix(ctx):
     embed = discord.Embed(
         title="💰 Payment Log",
         description="Order completed - payment information logged",
-        color=0x00FF00,
+        color=0x6B8E6B,
         timestamp=datetime.utcnow()
     )
     
