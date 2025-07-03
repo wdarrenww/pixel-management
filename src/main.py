@@ -106,107 +106,82 @@ DESIGN_CATEGORY_IDS = [
 class ServiceSelectionView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=60)
-        # Disable buttons for closed services
-        for child in self.children:
-            if hasattr(child, 'custom_id'):
-                service_name = self.get_service_name_from_custom_id(child.custom_id)
-                if service_name and order_status_data.get(service_name, "open") == "closed":
-                    child.disabled = True
-                    child.label = f"{child.label} (Closed)"
+        # Add the service selection dropdown
+        self.add_item(ServiceSelect())
+
+class ServiceSelect(discord.ui.Select):
+    def __init__(self):
+        # Create options for the dropdown
+        options = []
+        
+        # Define all services with their status
+        services = [
+            ("Logo Design", "logo_design", "🎨 Professional logo creation"),
+            ("Clothing Design", "clothing_design", "👕 Complete uniform designs"),
+            ("Livery", "livery", "🚗 Vehicle livery designs"),
+            ("ELS", "els", "🚨 Emergency lighting systems"),
+            ("Banner & Graphics", "banner_graphics", "🖼️ Banner and graphic designs"),
+            ("Discord Layout", "discord_layout", "💬 Full Discord server design"),
+            ("Photography", "photography", "📸 Professional photography")
+        ]
+        
+        for service_name, service_id, description in services:
+            # Check if service is closed
+            status = order_status_data.get(service_name, "open")
+            if status == "closed":
+                options.append(
+                    discord.SelectOption(
+                        label=f"{service_name} (Closed)",
+                        description=f"{description} - Currently unavailable",
+                        value=service_id,
+                        emoji="🔒",
+                        default=False
+                    )
+                )
+            else:
+                emoji = "✅" if status == "open" else "⚠️"
+                options.append(
+                    discord.SelectOption(
+                        label=service_name,
+                        description=description,
+                        value=service_id,
+                        emoji=emoji,
+                        default=False
+                    )
+                )
+        
+        super().__init__(
+            placeholder="Select a service...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="service_select"
+        )
     
-    def get_service_name_from_custom_id(self, custom_id):
-        """Map custom_id to service name"""
+    async def callback(self, interaction: discord.Interaction):
+        # Map the selected value to service name
         service_mapping = {
             "logo_design": "Logo Design",
             "clothing_design": "Clothing Design",
             "livery": "Livery",
-            "els_only": "ELS",
+            "els": "ELS",
             "banner_graphics": "Banner and Graphics",
             "discord_layout": "Full Discord Server Design",
             "photography": "Professional Photography"
         }
-        return service_mapping.get(custom_id)
-    
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        """Check if the interaction is valid and handle disabled buttons"""
-        # Check if the clicked button is disabled
-        for child in self.children:
-            if (hasattr(child, 'custom_id') and 
-                child.custom_id == interaction.data.get('custom_id') and 
-                child.disabled):
-                
-                service_name = self.get_service_name_from_custom_id(child.custom_id)
-                if service_name:
-                    embed = discord.Embed(
-                        title="Service Temporarily Unavailable",
-                        description=(
-                            f"We apologize, but **{service_name}** is currently closed for new orders.\n\n"
-                            f"**Why is this service closed?**\n"
-                            f"• We may be at full capacity for this service type\n"
-                            f"• Our team is focusing on existing orders\n"
-                            f"• We're temporarily restructuring our workflow\n\n"
-                            f"**What can you do?**\n"
-                            f"• Check back later for availability updates\n"
-                            f"• Consider our other available services\n"
-                            f"• Contact our team for custom arrangements\n\n"
-                            f"Thank you for your understanding! 🙏"
-                        ),
-                        color=0xFF6B6B,
-                        timestamp=datetime.utcnow()
-                    )
-                    embed.set_footer(text=".pixel Design Services • We'll be back soon!")
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                    return False
         
-        return True
-
-    @discord.ui.button(label="Logo Design", style=discord.ButtonStyle.primary, custom_id="logo_design")
-    async def logo_design(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "Logo Design")
-
-    @discord.ui.button(label="Clothing Design", style=discord.ButtonStyle.primary, custom_id="clothing_design")
-    async def clothing_design(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "Clothing Design")
-
-    @discord.ui.button(label="Livery", style=discord.ButtonStyle.primary, custom_id="livery")
-    async def livery(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "Livery")
-    
-    @discord.ui.button(label="ELS Only", style=discord.ButtonStyle.secondary, custom_id="els_only")
-    async def els_only(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "ELS")
-
-    @discord.ui.button(label="Banner & Graphics", style=discord.ButtonStyle.primary, custom_id="banner_graphics")
-    async def banner_graphics(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "Banner and Graphics")
-
-    @discord.ui.button(label="Discord Layout", style=discord.ButtonStyle.primary, custom_id="discord_layout")
-    async def discord_layout(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "Full Discord Server Design")
-
-    @discord.ui.button(label="Photography", style=discord.ButtonStyle.primary, custom_id="photography")
-    async def photography(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_ticket(interaction, "Professional Photography")
-
-    async def create_ticket(self, interaction: discord.Interaction, service_type: str):
-        guild = interaction.guild
-        user = interaction.user
+        selected_service = service_mapping.get(self.values[0])
         
-        # Check if user already has an open ticket
-        existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
-        if existing_ticket:
-            await interaction.response.send_message(
-                f"You already have an open ticket: {existing_ticket.mention}",
-                ephemeral=True
-            )
+        if not selected_service:
+            await interaction.response.send_message("Invalid service selected.", ephemeral=True)
             return
         
-        # Check if service is closed (double-check in case button wasn't disabled)
-        if order_status_data.get(service_type, "open") == "closed":
+        # Check if service is closed
+        if order_status_data.get(selected_service, "open") == "closed":
             embed = discord.Embed(
                 title="Service Temporarily Unavailable",
                 description=(
-                    f"We apologize, but **{service_type}** is currently closed for new orders.\n\n"
+                    f"We apologize, but **{selected_service}** is currently closed for new orders.\n\n"
                     f"**Why is this service closed?**\n"
                     f"• We may be at full capacity for this service type\n"
                     f"• Our team is focusing on existing orders\n"
@@ -222,6 +197,22 @@ class ServiceSelectionView(discord.ui.View):
             )
             embed.set_footer(text=".pixel Design Services • We'll be back soon!")
             await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Create the ticket
+        await self.create_ticket(interaction, selected_service)
+    
+    async def create_ticket(self, interaction: discord.Interaction, service_type: str):
+        guild = interaction.guild
+        user = interaction.user
+        
+        # Check if user already has an open ticket
+        existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
+        if existing_ticket:
+            await interaction.response.send_message(
+                f"You already have an open ticket: {existing_ticket.mention}",
+                ephemeral=True
+            )
             return
         
         # Get category
