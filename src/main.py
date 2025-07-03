@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime
 from discord import app_commands
+import math
 
 # Global variables for order status management
 order_status_message_id = None
@@ -1888,6 +1889,110 @@ async def payment_log_prefix(ctx):
             await ctx.send("❌ - Payment log channel not found.", delete_after=5)
     except Exception as e:
         await ctx.send(f"❌ - Error logging payment: {str(e)}", delete_after=10)
+
+@bot.command(name='tax')
+async def calculate_tax(ctx, amount: int):
+    """Calculate the amount needed to account for Roblox's 70% cut"""
+    if amount <= 0:
+        await ctx.send("Please provide a positive amount.", delete_after=5)
+        return
+    
+    # Calculate the amount needed to get the desired payout after 70% cut
+    # Formula: desired_amount / 0.7 (since Roblox takes 30%, you keep 70%)
+    required_amount = math.ceil(amount / 0.7)
+    
+    embed = discord.Embed(
+        title="💰 Tax Calculator",
+        description="Calculate amount needed to account for Roblox's 70% cut",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(
+        name="Desired Payout",
+        value=f"**{amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Required Amount",
+        value=f"**{required_amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Roblox Cut (30%)",
+        value=f"**{required_amount - amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Your Payout (70%)",
+        value=f"**{amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Calculation",
+        value=f"`{amount} ÷ 0.7 = {required_amount}` (rounded up)",
+        inline=False
+    )
+    
+    embed.set_footer(text=".pixel Design Services • Tax Calculator")
+    
+    await ctx.send(embed=embed)
+
+@bot.tree.command(name="tax", description="Calculate the amount needed to account for Roblox's 70% cut")
+@app_commands.describe(amount="The desired payout amount in RBX")
+async def slash_calculate_tax(interaction: discord.Interaction, amount: int):
+    """Slash command version of tax calculation"""
+    if amount <= 0:
+        await interaction.response.send_message("Please provide a positive amount.", ephemeral=True)
+        return
+    
+    # Calculate the amount needed to get the desired payout after 70% cut
+    required_amount = math.ceil(amount / 0.7)
+    
+    embed = discord.Embed(
+        title="💰 Tax Calculator",
+        description="Calculate amount needed to account for Roblox's 70% cut",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(
+        name="Desired Payout",
+        value=f"**{amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Required Amount",
+        value=f"**{required_amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Roblox Cut (30%)",
+        value=f"**{required_amount - amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Your Payout (70%)",
+        value=f"**{amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Calculation",
+        value=f"`{amount} ÷ 0.7 = {required_amount}` (rounded up)",
+        inline=False
+    )
+    
+    embed.set_footer(text=".pixel Design Services • Tax Calculator")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # Run the bot
 if __name__ == "__main__":
