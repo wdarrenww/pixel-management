@@ -1,0 +1,6 @@
+# Discord Bot Configuration
+DISCORD_TOKEN=your_bot_token_here
+
+# Optional: Override config.json settings
+ORDER_ROLE_ID=1362585427621707999
+TICKET_CHANNEL_ID=1390384385177554965 
