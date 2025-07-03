@@ -242,7 +242,7 @@ class ServiceSelect(discord.ui.Select):
         )
         await self.send_welcome_message(ticket_channel, user, service_type)
         await interaction.response.send_message(
-            f"✅ Your {service_type} ticket has been created: {ticket_channel.mention}",
+            f"our {service_type} ticket has been created: {ticket_channel.mention}!",
             ephemeral=True
         )
 
@@ -262,7 +262,7 @@ class ServiceSelect(discord.ui.Select):
             description=(
                 f"Thank you for choosing .pixel, {user.mention}! 🎨\n\n"
                 f"We're excited to bring your vision to life with our professional {service_type.lower()} services.\n\n"
-                f"**To get started, please provide the following details:**\n\n"
+                f"**To start, please fill out the form below and provide these details:**\n\n"
                 f"**📋 Type:** (e.g., PD for liveries, server logo for graphics)\n"
                 f"**🎨 Customizations:** Detailed description including colors, style preferences, and specific requirements\n"
                 f"**📸 Reference(s):** Any images or examples that inspire your vision\n"
@@ -275,13 +275,15 @@ class ServiceSelect(discord.ui.Select):
         )
         embed.set_footer(text=".pixel Design Services • Professional Quality")
         
+        # Add banner as embed image if available
+        if banner_url != "https://example.com/default_banner.png":
+            embed.set_image(url=banner_url)
+        
         # Create ticket management view
         ticket_view = TicketManagementView()
         
         # Send embed with banner and management buttons
         await channel.send(embed=embed, view=ticket_view)
-        if banner_url != "https://example.com/default_banner.png":
-            await channel.send(banner_url)
         
         # Log ticket creation
         await self.log_ticket_creation(channel, user, service_type)
@@ -331,7 +333,7 @@ class TicketManagementView(discord.ui.View):
             
             # Send claim message
             embed = discord.Embed(
-                title="✅ Ticket Claimed!",
+                title="Ticket Claimed Successfully!",
                 description=f"{interaction.user.mention} has claimed this ticket!",
                 color=0x00FF00,
                 timestamp=datetime.utcnow()
@@ -683,6 +685,9 @@ async def create_order_embed(ctx):
     
     embed.set_footer(text="Professional Design Services • Quality Guaranteed")
     
+    # Add main ordering image
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
+    
     # Send the embed with buttons and store the message ID
     message = await ctx.send(embed=embed, view=TicketOrderView())
     global order_status_message_id
@@ -884,6 +889,9 @@ async def update_order_status(ctx, *, args: str):
             
             embed.set_footer(text="Professional Design Services • Quality Guaranteed")
             
+            # Add main ordering image
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
+            
             # Edit the message with updated embed
             await message.edit(embed=embed, view=TicketOrderView())
             
@@ -952,13 +960,13 @@ async def show_order_status(ctx):
     for service, status in order_status_data.items():
         if status == "open":
             embed.add_field(
-                name=f"✅ {service}",
+                name=f"✅ - {service}",
                 value="<:Open1:1385136250406572154><:Open2:1385136269604159520> **Open for Orders**",
                 inline=True
             )
         elif status == "delayed":
             embed.add_field(
-                name=f"⚠️ {service}",
+                name=f"⚠️ - {service}",
                 value="<:Delayed1:1385141081926275233><:Delayed2:1385141097340338216><:Delayed3:1385141115614789774> **Currently Delayed**",
                 inline=True
             )
@@ -1037,9 +1045,10 @@ async def slash_create_order_embed(interaction: discord.Interaction):
         inline=False
     )
     
-    embed.set_image(url="https://media.discordapp.net/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354&=&format=webp&quality=lossless&width=2050&height=684")
-    
     embed.set_footer(text="Professional Design Services • Quality Guaranteed")
+    
+    # Add main ordering image
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
     
     # Send the embed with buttons and store the message ID
     await interaction.response.send_message(embed=embed, view=TicketOrderView())
@@ -1155,11 +1164,14 @@ async def slash_update_order_status(interaction: discord.Interaction, service: s
             
             embed.set_footer(text="Professional Design Services • Quality Guaranteed")
             
+            # Add main ordering image
+            embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
+            
             # Edit the message with updated embed
             await message.edit(embed=embed, view=TicketOrderView())
             
             # Send confirmation
-            await interaction.response.send_message(f"✅ Updated {service} status to {status.lower()}", ephemeral=True)
+            await interaction.response.send_message(f"Updated {service} status to {status.lower()} successfully!", ephemeral=True)
             
         except discord.NotFound:
             embed = discord.Embed(
@@ -1352,13 +1364,13 @@ async def slash_show_order_status(interaction: discord.Interaction):
     for service, status in order_status_data.items():
         if status == "open":
             embed.add_field(
-                name=f"✅ {service}",
+                name=f"✅ - {service}",
                 value="<:Open1:1385136250406572154><:Open2:1385136269604159520> **Open for Orders**",
                 inline=True
             )
         elif status == "delayed":
             embed.add_field(
-                name=f"⚠️ {service}",
+                name=f"⚠️ - {service}",
                 value="<:Delayed1:1385141081926275233><:Delayed2:1385141097340338216><:Delayed3:1385141115614789774> **Currently Delayed**",
                 inline=True
             )
@@ -1543,7 +1555,7 @@ async def sync_commands(ctx):
             raise e
         
         embed = discord.Embed(
-            title="✅ Commands Synced Successfully",
+            title="✅ - Commands Synced Successfully",
             description=f"Successfully synced {len(synced)} command(s) to {guild.name}",
             color=0x00FF00,
             timestamp=datetime.utcnow()
@@ -1684,7 +1696,7 @@ async def finished_order(interaction: discord.Interaction):
         logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
         if logging_channel:
             log_embed = discord.Embed(
-                title="✅ Order Finished",
+                title="Order Finished Successfully!",
                 description=f"A ticket has been marked as finished.",
                 color=0x1B75BD,
                 timestamp=datetime.utcnow()
@@ -1786,11 +1798,11 @@ async def payment_log(interaction: discord.Interaction):
         payment_channel = channel.guild.get_channel(PAYMENT_LOG_CHANNEL_ID)
         if payment_channel:
             await payment_channel.send(embed=embed)
-            await interaction.response.send_message("✅ Payment information logged successfully!", ephemeral=True)
+            await interaction.response.send_message("✅ - Payment information logged successfully!", ephemeral=True)
         else:
-            await interaction.response.send_message("❌ Payment log channel not found.", ephemeral=True)
+            await interaction.response.send_message("❌ - Payment log channel not found.", ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(f"❌ Error logging payment: {str(e)}", ephemeral=True)
+        await interaction.response.send_message(f"❌ - Error logging payment: {str(e)}", ephemeral=True)
 
 @bot.command(name='pl')
 async def payment_log_prefix(ctx):
@@ -1842,11 +1854,11 @@ async def payment_log_prefix(ctx):
         payment_channel = channel.guild.get_channel(PAYMENT_LOG_CHANNEL_ID)
         if payment_channel:
             await payment_channel.send(embed=embed)
-            await ctx.send("✅ Payment information logged successfully!", delete_after=5)
+            await ctx.send("✅ - Payment information logged successfully!", delete_after=5)
         else:
-            await ctx.send("❌ Payment log channel not found.", delete_after=5)
+            await ctx.send("❌ - Payment log channel not found.", delete_after=5)
     except Exception as e:
-        await ctx.send(f"❌ Error logging payment: {str(e)}", delete_after=10)
+        await ctx.send(f"❌ - Error logging payment: {str(e)}", delete_after=10)
 
 # Run the bot
 if __name__ == "__main__":
