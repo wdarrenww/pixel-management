@@ -21,7 +21,7 @@ order_status_data = {
 
 # Configuration constants
 ORDER_ROLE_ID = 1362585427621707999
-TICKET_CHANNEL_ID = 1390384385177554965
+TICKET_CHANNEL_ID = 1362585428510642325
 CLAIM_ROLE_ID = 1362585427168592018
 CLOSE_ROLE_ID = 1362585427550146618
 MANAGER_ROLE_ID = 1362585427550146618
@@ -471,6 +471,59 @@ class CloseConfirmationView(discord.ui.View):
         except Exception as e:
             print(f"Error logging ticket close: {e}")
 
+class PaymentLogView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Paid Out", style=discord.ButtonStyle.success, custom_id="paid_out")
+    async def paid_out(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has manager role (only managers should mark as paid out)
+        if not has_manager_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to mark payments as paid out.", ephemeral=True)
+            return
+        
+        # Disable the button and change its appearance
+        button.disabled = True
+        button.label = "✅ Paid Out"
+        button.style = discord.ButtonStyle.secondary
+        
+        # Update the embed to show it's been paid out
+        embed = interaction.message.embeds[0]
+        embed.color = 0x6B8E6B  # Muted green color
+        embed.add_field(
+            name="Payment Status",
+            value=f"✅ **Paid Out** by {interaction.user.mention}",
+            inline=False
+        )
+        
+        # Update the message
+        await interaction.message.edit(embed=embed, view=self)
+        
+        # Send confirmation
+        await interaction.response.send_message("Payment marked as paid out successfully!", ephemeral=True)
+        
+        # Log the payment completion
+        await self.log_payment_completion(interaction.message, interaction.user)
+    
+    async def log_payment_completion(self, message, user):
+        """Log payment completion to the logging channel"""
+        try:
+            logging_channel = message.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="💰 Payment Completed",
+                    description=f"A payment has been marked as paid out",
+                    color=0x6B8E6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Marked By", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Payment Log", value=message.jump_url, inline=True)
+                embed.set_footer(text="Payment processing complete")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging payment completion: {e}")
+
 class TicketOrderView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -598,6 +651,7 @@ async def on_ready():
     bot.add_view(TicketOrderView())
     bot.add_view(TicketManagementView())
     bot.add_view(CloseConfirmationView())
+    bot.add_view(PaymentLogView())
     
     # Sync slash commands to specific guild for faster propagation
     GUILD_ID = 1362585427093229709
@@ -1827,7 +1881,8 @@ async def payment_log(interaction: discord.Interaction):
     try:
         payment_channel = channel.guild.get_channel(PAYMENT_LOG_CHANNEL_ID)
         if payment_channel:
-            await payment_channel.send(embed=embed)
+            payment_view = PaymentLogView()
+            await payment_channel.send(embed=embed, view=payment_view)
             await interaction.response.send_message("✅ - Payment information logged successfully!", ephemeral=True)
         else:
             await interaction.response.send_message("❌ - Payment log channel not found.", ephemeral=True)
@@ -1883,7 +1938,8 @@ async def payment_log_prefix(ctx):
     try:
         payment_channel = channel.guild.get_channel(PAYMENT_LOG_CHANNEL_ID)
         if payment_channel:
-            await payment_channel.send(embed=embed)
+            payment_view = PaymentLogView()
+            await payment_channel.send(embed=embed, view=payment_view)
             await ctx.send("✅ - Payment information logged successfully!", delete_after=5)
         else:
             await ctx.send("❌ - Payment log channel not found.", delete_after=5)
