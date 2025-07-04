@@ -620,6 +620,12 @@ class TicketOrderView(discord.ui.View):
             value="**Starting at 100 RBX per banner**\nProfessional banner and graphics design masterfully crafted!",
             inline=False
         )
+        
+        embed.add_field(
+            name="Photography",
+            value="**Starting at 50 RBX per photo**\nHigh quality photography for your entire server!",
+            inline=False
+        )
                 
         embed.add_field(
             name="What's Included with Every Order",
