@@ -3,6 +3,7 @@ from discord.ext import commands
 import asyncio
 import json
 import os
+import random
 from datetime import datetime
 from discord import app_commands
 import math
@@ -27,6 +28,7 @@ CLOSE_ROLE_ID = 1362585427550146618
 MANAGER_ROLE_ID = 1362585427550146618
 LOGGING_CHANNEL_ID = 1362585429706019031
 PAYMENT_LOG_CHANNEL_ID = 1390420651504042115
+WELCOME_CHANNEL_ID = 1362585428850638903
 
 # Consolidated role lists
 MANAGER_ROLE_IDS = [
@@ -524,6 +526,32 @@ class PaymentLogView(discord.ui.View):
         except Exception as e:
             print(f"Error logging payment completion: {e}")
 
+class WelcomeView(discord.ui.View):
+    def __init__(self, member_count: int):
+        super().__init__(timeout=None)
+        self.member_count = member_count
+    
+    @discord.ui.button(label="📋 Server Information", style=discord.ButtonStyle.primary, custom_id="server_info")
+    async def server_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "📋 **Server Information**\n\n"
+            "Welcome to .pixel! Here you'll find everything you need to know about our design services.\n\n"
+            "**Quick Links:**\n"
+            "• <#1362585428183613587> - Server information and rules\n"
+            "• <#1362585428510642325> - Order our design services\n"
+            "• <#1362585429706019031> - View our work and updates\n\n"
+            "Feel free to explore and ask any questions!",
+            ephemeral=True
+        )
+    
+    @discord.ui.button(label="👥 Member Count", style=discord.ButtonStyle.secondary, custom_id="member_count")
+    async def member_count(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"👥 **Current Member Count:** {self.member_count:,} members\n\n"
+            f"Thanks for being part of our growing community! 🎉",
+            ephemeral=True
+        )
+
 class TicketOrderView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -658,6 +686,7 @@ async def on_ready():
     bot.add_view(TicketManagementView())
     bot.add_view(CloseConfirmationView())
     bot.add_view(PaymentLogView())
+    bot.add_view(WelcomeView(0))  # Will be updated with actual member count
     
     # Sync slash commands to specific guild for faster propagation
     GUILD_ID = 1362585427093229709
@@ -710,6 +739,50 @@ async def on_ready():
             print(f"Global sync completed: {len(synced)} command(s)")
         except Exception as fallback_error:
             print(f"Global sync also failed: {fallback_error}")
+
+@bot.event
+async def on_member_join(member):
+    """Send welcome message when a new member joins"""
+    try:
+        # Get the welcome channel
+        welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
+        if not welcome_channel:
+            print(f"Welcome channel {WELCOME_CHANNEL_ID} not found")
+            return
+        
+        # Get current member count
+        member_count = member.guild.member_count
+        
+        # Create welcome message
+        welcome_messages = [
+            f"{member.mention}, welcome to .pixel! We're excited to have you here!",
+            f"{member.mention}, welcome to .pixel! Ready to create something amazing?",
+            f"{member.mention}, welcome to .pixel! Your creative journey starts now!",
+            f"{member.mention}, welcome to .pixel! We can't wait to see what you'll design!",
+            f"{member.mention}, welcome to .pixel! Let's make something beautiful together!"
+        ]
+        
+        # Select a random welcome message
+        welcome_text = random.choice(welcome_messages)
+        
+        # Create welcome embed
+        embed = discord.Embed(
+            title="Welcome to .pixel!",
+            description=welcome_text,
+            color=0x1B75BD,
+        )
+        embed.set_footer(text=".pixel Design Services • Professional Quality")
+        
+        # Create welcome view with buttons
+        welcome_view = WelcomeView(member_count)
+        
+        # Send welcome message
+        await welcome_channel.send(embed=embed, view=welcome_view)
+        
+        print(f"Welcome message sent for {member.name} in {welcome_channel.name}")
+        
+    except Exception as e:
+        print(f"Error sending welcome message: {e}")
 
 @bot.command(name='oe')
 async def create_order_embed(ctx):
