@@ -627,7 +627,7 @@ class TicketOrderView(discord.ui.View):
         
         embed.add_field(
             name="Clothing Design",
-            value="**Starting at 80 RBX per item**\nComplete professional uniforms for your entire server!",
+            value="**Starting at 95 RBX per item**\nComplete professional uniforms for your entire server!",
             inline=False
         )
         
@@ -742,30 +742,23 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member):
-    """Send welcome message when a new member joins"""
+    """send new welcome message"""
     try:
-        # Get the welcome channel
         welcome_channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
         if not welcome_channel:
             print(f"Welcome channel {WELCOME_CHANNEL_ID} not found")
             return
         
-        # Get current member count
         member_count = member.guild.member_count
         
-        # Create welcome message
-        welcome_messages = [
+        welc_messages = [
             f"{member.mention}, welcome to .pixel! We're excited to have you here!",
             f"{member.mention}, welcome to .pixel! Ready to create something amazing?",
-            f"{member.mention}, welcome to .pixel! Your creative journey starts now!",
-            f"{member.mention}, welcome to .pixel! We can't wait to see what you'll design!",
-            f"{member.mention}, welcome to .pixel! Let's make something beautiful together!"
+            f"{member.mention}, welcome to .pixel! We hope you enjoy your time here!",
         ]
         
-        # Select a random welcome message
-        welcome_text = random.choice(welcome_messages)
+        welcome_text = random.choice(welc_messages)
         
-        # Create welcome embed
         embed = discord.Embed(
             title="Welcome to .pixel!",
             description=welcome_text,
@@ -773,14 +766,10 @@ async def on_member_join(member):
         )
         embed.set_footer(text=".pixel Design Services • Professional Quality")
         
-        # Create welcome view with buttons
         welcome_view = WelcomeView(member_count)
         
-        # Send welcome message
         await welcome_channel.send(embed=embed, view=welcome_view)
-        
-        print(f"Welcome message sent for {member.name} in {welcome_channel.name}")
-        
+                
     except Exception as e:
         print(f"Error sending welcome message: {e}")
 
