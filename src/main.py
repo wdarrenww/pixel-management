@@ -29,6 +29,8 @@ MANAGER_ROLE_ID = 1362585427550146618
 LOGGING_CHANNEL_ID = 1362585429706019031
 PAYMENT_LOG_CHANNEL_ID = 1390420651504042115
 WELCOME_CHANNEL_ID = 1362585428850638903
+REVIEW_CHANNEL_ID = 1362585428850638900
+REVIEW_ROLE_ID = 1391506674896080926
 
 # Consolidated role lists
 MANAGER_ROLE_IDS = [
@@ -84,6 +86,14 @@ completion_time_choices = [
     app_commands.Choice(name="2-3 weeks", value="2-3 weeks"),
     app_commands.Choice(name="1 month", value="1 month"),
     app_commands.Choice(name="Custom", value="custom")
+]
+
+rating_choices = [
+    app_commands.Choice(name="1 Star", value=1),
+    app_commands.Choice(name="2 Stars", value=2),
+    app_commands.Choice(name="3 Stars", value=3),
+    app_commands.Choice(name="4 Stars", value=4),
+    app_commands.Choice(name="5 Stars", value=5)
 ]
 
 # Category IDs for different service types
@@ -1819,6 +1829,11 @@ async def finished_order(interaction: discord.Interaction):
         await interaction.response.send_message("This command can only be used in ticket channels.", ephemeral=True)
         return
 
+    # Get order details to find the customer
+    customer = None
+    if channel.id in order_details:
+        customer = order_details[channel.id]['customer']
+    
     # Rename the channel to finished-username
     username = channel.name.split('-', 1)[-1]
     new_name = f"finished-{username}"
@@ -1827,6 +1842,21 @@ async def finished_order(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"Failed to rename channel: {e}", ephemeral=True)
         return
+
+    # Assign customer role if customer is found
+    if customer:
+        try:
+            customer_role = channel.guild.get_role(REVIEW_ROLE_ID)  # Using REVIEW_ROLE_ID as customer role
+            if customer_role and customer_role not in customer.roles:
+                await customer.add_roles(customer_role)
+                role_assigned = True
+            else:
+                role_assigned = False
+        except Exception as e:
+            print(f"Error assigning customer role: {e}")
+            role_assigned = False
+    else:
+        role_assigned = False
 
     # Send thank you embed
     embed = discord.Embed(
@@ -1843,6 +1873,17 @@ async def finished_order(interaction: discord.Interaction):
     embed.set_footer(text=".pixel Design Services • Thank you for your order!")
     await channel.send(embed=embed)
 
+    # Send role assignment notification if applicable
+    if customer and role_assigned:
+        role_embed = discord.Embed(
+            title="✅ Customer Role Assigned",
+            description=f"{customer.mention} has been assigned the customer role and can now submit reviews!",
+            color=0x6B8E6B,
+            timestamp=datetime.utcnow()
+        )
+        role_embed.set_footer(text=".pixel Design Services • Review System")
+        await channel.send(embed=role_embed)
+
     # Log the completion
     try:
         logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
@@ -1855,6 +1896,9 @@ async def finished_order(interaction: discord.Interaction):
             )
             log_embed.add_field(name="Channel", value=channel.mention, inline=True)
             log_embed.add_field(name="Finished By", value=f"{interaction.user.mention} ({interaction.user.name})", inline=True)
+            if customer:
+                log_embed.add_field(name="Customer", value=f"{customer.mention} ({customer.name})", inline=True)
+                log_embed.add_field(name="Role Assigned", value="✅ Yes" if role_assigned else "❌ No", inline=True)
             log_embed.set_footer(text=f"Ticket ID: {channel.id}")
             await logging_channel.send(embed=log_embed)
     except Exception as e:
@@ -2014,6 +2058,58 @@ async def payment_log_prefix(ctx):
     except Exception as e:
         await ctx.send(f"❌ - Error logging payment: {str(e)}", delete_after=10)
 
+@bot.tree.command(name="tax", description="Calculate the amount needed to account for Roblox's 70% cut")
+@app_commands.describe(amount="The desired payout amount in RBX")
+async def slash_calculate_tax(interaction: discord.Interaction, amount: int):
+    """Slash command version of tax calculation"""
+    if amount <= 0:
+        await interaction.response.send_message("Please provide a positive amount.", ephemeral=True)
+        return
+    
+    # Calculate the amount needed to get the desired payout after 70% cut
+    required_amount = math.ceil(amount / 0.7)
+    
+    embed = discord.Embed(
+        title="💰 Tax Calculator",
+        description="Calculate amount needed to account for Roblox's 70% cut",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(
+        name="Desired Payout",
+        value=f"**{amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Required Amount",
+        value=f"**{required_amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Roblox Cut (30%)",
+        value=f"**{required_amount - amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Your Payout (70%)",
+        value=f"**{amount:,} RBX**",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Calculation",
+        value=f"`{amount} ÷ 0.7 = {required_amount}` (rounded up)",
+        inline=False
+    )
+    
+    embed.set_footer(text=".pixel Design Services • Tax Calculator")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 @bot.command(name='tax')
 async def calculate_tax(ctx, amount: int):
     """Calculate the amount needed to account for Roblox's 70% cut"""
@@ -2066,57 +2162,242 @@ async def calculate_tax(ctx, amount: int):
     
     await ctx.send(embed=embed)
 
-@bot.tree.command(name="tax", description="Calculate the amount needed to account for Roblox's 70% cut")
-@app_commands.describe(amount="The desired payout amount in RBX")
-async def slash_calculate_tax(interaction: discord.Interaction, amount: int):
-    """Slash command version of tax calculation"""
-    if amount <= 0:
-        await interaction.response.send_message("Please provide a positive amount.", ephemeral=True)
+@bot.tree.command(name="review", description="Submit a review for a designer (role restricted)")
+@app_commands.describe(
+    designer="The designer to review",
+    product="The product or service being reviewed",
+    rating="Rating out of 5 stars",
+    remarks="Additional remarks about the experience"
+)
+@app_commands.choices(rating=rating_choices)
+async def review_command(interaction: discord.Interaction, designer: discord.Member, product: str, rating: int, remarks: str):
+    """Submit a review for a designer"""
+    # Check if user has the required role
+    user_role_ids = [role.id for role in interaction.user.roles]
+    if REVIEW_ROLE_ID not in user_role_ids:
+        await interaction.response.send_message("You don't have permission to submit reviews.", ephemeral=True)
         return
     
-    # Calculate the amount needed to get the desired payout after 70% cut
-    required_amount = math.ceil(amount / 0.7)
+    # Validate designer selection
+    if designer.bot:
+        await interaction.response.send_message("You cannot review a bot.", ephemeral=True)
+        return
     
+    if designer == interaction.user:
+        await interaction.response.send_message("You cannot review yourself.", ephemeral=True)
+        return
+    
+    # Check if designer has any designer role
+    if not has_designer_role(designer):
+        await interaction.response.send_message("You can only review team members with designer roles.", ephemeral=True)
+        return
+    
+    # Validate product length
+    if len(product) < 3 or len(product) > 100:
+        await interaction.response.send_message("Product/Service must be between 3 and 100 characters.", ephemeral=True)
+        return
+    
+    # Validate remarks length
+    if len(remarks) < 10 or len(remarks) > 1000:
+        await interaction.response.send_message("Remarks must be between 10 and 1000 characters.", ephemeral=True)
+        return
+    
+    # Create stars display
+    stars = "<:pixelstar:1391507348618612766>" * rating
+    empty_stars = "⭐" * (5 - rating)
+    full_stars_display = stars + empty_stars
+    
+    # Create review embed
     embed = discord.Embed(
-        title="💰 Tax Calculator",
-        description="Calculate amount needed to account for Roblox's 70% cut",
+        title="⭐ Customer Review",
+        description=f"A new review has been submitted for {designer.mention}",
         color=0x1B75BD,
         timestamp=datetime.utcnow()
     )
     
     embed.add_field(
-        name="Desired Payout",
-        value=f"**{amount:,} RBX**",
+        name="Designer",
+        value=f"{designer.mention} ({designer.name})",
         inline=True
     )
     
     embed.add_field(
-        name="Required Amount",
-        value=f"**{required_amount:,} RBX**",
+        name="Product/Service",
+        value=product,
         inline=True
     )
     
     embed.add_field(
-        name="Roblox Cut (30%)",
-        value=f"**{required_amount - amount:,} RBX**",
+        name="Rating",
+        value=f"{full_stars_display} ({rating}/5)",
         inline=True
     )
     
     embed.add_field(
-        name="Your Payout (70%)",
-        value=f"**{amount:,} RBX**",
+        name="Reviewer",
+        value=f"{interaction.user.mention} ({interaction.user.name})",
         inline=True
     )
     
     embed.add_field(
-        name="Calculation",
-        value=f"`{amount} ÷ 0.7 = {required_amount}` (rounded up)",
+        name="Remarks",
+        value=remarks,
         inline=False
     )
     
-    embed.set_footer(text=".pixel Design Services • Tax Calculator")
+    embed.set_footer(text=f"Review ID: {interaction.id}")
     
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    # Send to review channel
+    try:
+        review_channel = interaction.guild.get_channel(REVIEW_CHANNEL_ID)
+        if review_channel:
+            await review_channel.send(embed=embed)
+            await interaction.response.send_message("✅ Review submitted successfully!", ephemeral=True)
+            
+            # Log the review
+            await log_review_submission_slash(interaction, designer, product, rating)
+        else:
+            await interaction.response.send_message("❌ Review channel not found.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error submitting review: {str(e)}", ephemeral=True)
+
+async def log_review_submission_slash(interaction, designer, product, rating):
+    """Log review submission to the logging channel (slash version)"""
+    try:
+        logging_channel = interaction.guild.get_channel(LOGGING_CHANNEL_ID)
+        if logging_channel:
+            embed = discord.Embed(
+                title="⭐ Review Submitted",
+                description=f"A new customer review has been submitted",
+                color=0x1B75BD,
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Designer", value=f"{designer.mention} ({designer.name})", inline=True)
+            embed.add_field(name="Product", value=product, inline=True)
+            embed.add_field(name="Rating", value=f"{rating}/5", inline=True)
+            embed.add_field(name="Reviewer", value=f"{interaction.user.mention} ({interaction.user.name})", inline=True)
+            embed.set_footer(text=f"Review ID: {interaction.id}")
+            
+            await logging_channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error logging review submission: {e}")
+
+
+
+@bot.command(name='review')
+async def review_prefix(ctx, designer: discord.Member, rating: int, *, remarks: str):
+    """Submit a review for a designer using prefix command"""
+    # Check if user has the required role
+    user_role_ids = [role.id for role in ctx.author.roles]
+    if REVIEW_ROLE_ID not in user_role_ids:
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to submit reviews.", delete_after=5)
+        return
+    
+    # Validate rating
+    if rating < 1 or rating > 5:
+        await ctx.message.delete()
+        await ctx.send("Rating must be between 1 and 5.", delete_after=5)
+        return
+    
+    # Validate designer selection
+    if designer.bot:
+        await ctx.message.delete()
+        await ctx.send("You cannot review a bot.", delete_after=5)
+        return
+    
+    if designer == ctx.author:
+        await ctx.message.delete()
+        await ctx.send("You cannot review yourself.", delete_after=5)
+        return
+    
+    # Check if designer has any designer role
+    if not has_designer_role(designer):
+        await ctx.message.delete()
+        await ctx.send("You can only review team members with designer roles.", delete_after=5)
+        return
+    
+    # Validate remarks length
+    if len(remarks) < 10:
+        await ctx.message.delete()
+        await ctx.send("Remarks must be at least 10 characters long.", delete_after=5)
+        return
+    
+    # Delete the command message
+    await ctx.message.delete()
+    
+    # Create stars display
+    stars = "<:pixelstar:1391507348618612766>" * rating
+    empty_stars = "⭐" * (5 - rating)
+    full_stars_display = stars + empty_stars
+    
+    # Create review embed
+    embed = discord.Embed(
+        title="⭐ Customer Review",
+        description=f"A new review has been submitted for {designer.mention}",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(
+        name="Designer",
+        value=f"{designer.mention} ({designer.name})",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Rating",
+        value=f"{full_stars_display} ({rating}/5)",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Reviewer",
+        value=f"{ctx.author.mention} ({ctx.author.name})",
+        inline=True
+    )
+    
+    embed.add_field(
+        name="Remarks",
+        value=remarks,
+        inline=False
+    )
+    
+    embed.set_footer(text=f"Review ID: {ctx.message.id}")
+    
+    # Send to review channel
+    try:
+        review_channel = ctx.guild.get_channel(REVIEW_CHANNEL_ID)
+        if review_channel:
+            await review_channel.send(embed=embed)
+            await ctx.send("✅ Review submitted successfully!", delete_after=5)
+            
+            # Log the review
+            await log_review_submission_prefix(ctx, designer, rating)
+        else:
+            await ctx.send("❌ Review channel not found.", delete_after=5)
+    except Exception as e:
+        await ctx.send(f"❌ Error submitting review: {str(e)}", delete_after=10)
+
+async def log_review_submission_prefix(ctx, designer, rating):
+    """Log review submission to the logging channel (prefix version)"""
+    try:
+        logging_channel = ctx.guild.get_channel(LOGGING_CHANNEL_ID)
+        if logging_channel:
+            embed = discord.Embed(
+                title="⭐ Review Submitted",
+                description=f"A new customer review has been submitted",
+                color=0x1B75BD,
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Designer", value=f"{designer.mention} ({designer.name})", inline=True)
+            embed.add_field(name="Rating", value=f"{rating}/5", inline=True)
+            embed.add_field(name="Reviewer", value=f"{ctx.author.mention} ({ctx.author.name})", inline=True)
+            embed.set_footer(text=f"Review ID: {ctx.message.id}")
+            
+            await logging_channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error logging review submission: {e}")
 
 # Run the bot
 if __name__ == "__main__":
