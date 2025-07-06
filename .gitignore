@@ -2,3 +2,6 @@
 .DS_Store
 .cpycache
 .pyc
+
+# pycache
+__pycache__/

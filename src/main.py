@@ -132,21 +132,23 @@ class ServiceSelectionView(discord.ui.View):
         super().__init__(timeout=60)
         # Add the service selection dropdown
         self.add_item(ServiceSelect())
+    
+    custom_id = "service_selection_view"
 
 class ServiceSelect(discord.ui.Select):
     def __init__(self):
         # Create options for the dropdown
         options = []
         
-        # Define all services with their status
+        # Define all services with their status - using exact names from order_status_data
         services = [
             ("Logo Design", "logo_design", "🎨 Professional logo creation"),
             ("Clothing Design", "clothing_design", "👕 Complete uniform designs"),
             ("Livery", "livery", "🚗 Vehicle livery designs"),
             ("ELS", "els", "🚨 Emergency lighting systems"),
-            ("Banner & Graphics", "banner_graphics", "🖼️ Banner and graphic designs"),
-            ("Discord Layout", "discord_layout", "💬 Full Discord server design"),
-            ("Photography", "photography", "📸 Professional photography")
+            ("Banner and Graphics", "banner_graphics", "🖼️ Banner and graphic designs"),
+            ("Full Discord Server Design", "discord_layout", "💬 Full Discord server design"),
+            ("Professional Photography", "photography", "📸 Professional photography")
         ]
         
         for service_name, service_id, description in services:
@@ -183,152 +185,168 @@ class ServiceSelect(discord.ui.Select):
         )
     
     async def callback(self, interaction: discord.Interaction):
-        # Map the selected value to service name
-        service_mapping = {
-            "logo_design": "Logo Design",
-            "clothing_design": "Clothing Design",
-            "livery": "Livery",
-            "els": "ELS",
-            "banner_graphics": "Banner and Graphics",
-            "discord_layout": "Full Discord Server Design",
-            "photography": "Professional Photography"
-        }
-        
-        selected_service = service_mapping.get(self.values[0])
-        
-        if not selected_service:
-            await interaction.response.send_message("Invalid service selected.", ephemeral=True)
-            return
-        
-        # Check if service is closed
-        if order_status_data.get(selected_service, "open") == "closed":
-            embed = discord.Embed(
-                title="Service Temporarily Unavailable",
-                description=(
-                    f"We apologize, but **{selected_service}** is currently closed for new orders.\n\n"
-                    f"**Why is this service closed?**\n"
-                    f"• We may be at full capacity for this service type\n"
-                    f"• Our team is focusing on existing orders\n"
-                    f"• We're temporarily restructuring our workflow\n\n"
-                    f"**What can you do?**\n"
-                    f"• Check back later for availability updates\n"
-                    f"• Consider our other available services\n"
-                    f"• Contact our team for custom arrangements\n\n"
-                    f"Thank you for your understanding! 🙏"
-                ),
-                color=0x8E6B6B,
-                timestamp=datetime.utcnow()
-            )
-            embed.set_footer(text=".pixel Design Services • We'll be back soon!")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-        
-        # Create the ticket
-        await self.create_ticket(interaction, selected_service)
+        try:
+            # Map the selected value to service name - using exact names from order_status_data
+            service_mapping = {
+                "logo_design": "Logo Design",
+                "clothing_design": "Clothing Design",
+                "livery": "Livery",
+                "els": "ELS",
+                "banner_graphics": "Banner and Graphics",
+                "discord_layout": "Full Discord Server Design",
+                "photography": "Professional Photography"
+            }
+            
+            selected_service = service_mapping.get(self.values[0])
+            
+            if not selected_service:
+                await interaction.response.send_message("Invalid service selected.", ephemeral=True)
+                return
+            
+            # Check if service is closed
+            if order_status_data.get(selected_service, "open") == "closed":
+                embed = discord.Embed(
+                    title="Service Temporarily Unavailable",
+                    description=(
+                        f"We apologize, but **{selected_service}** is currently closed for new orders.\n\n"
+                        f"**Why is this service closed?**\n"
+                        f"• We may be at full capacity for this service type\n"
+                        f"• Our team is focusing on existing orders\n"
+                        f"• We're temporarily restructuring our workflow\n\n"
+                        f"**What can you do?**\n"
+                        f"• Check back later for availability updates\n"
+                        f"• Consider our other available services\n"
+                        f"• Contact our team for custom arrangements\n\n"
+                        f"Thank you for your understanding! 🙏"
+                    ),
+                    color=0x8E6B6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.set_footer(text=".pixel Design Services • We'll be back soon!")
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+            
+            # Create the ticket
+            await self.create_ticket(interaction, selected_service)
+        except Exception as e:
+            print(f"Error in ServiceSelect callback: {e}")
+            await interaction.response.send_message("An error occurred while processing your selection. Please try again.", ephemeral=True)
     
     async def create_ticket(self, interaction: discord.Interaction, service_type: str):
-        guild = interaction.guild
-        user = interaction.user
-        
-        # Check if user already has an open ticket
-        existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
-        if existing_ticket:
+        try:
+            guild = interaction.guild
+            user = interaction.user
+            
+            # Check if user already has an open ticket
+            existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
+            if existing_ticket:
+                await interaction.response.send_message(
+                    f"You already have an open ticket: {existing_ticket.mention}",
+                    ephemeral=True
+                )
+                return
+            
+            # Get category
+            category_id = CATEGORY_IDS.get(service_type)
+            if not category_id:
+                await interaction.response.send_message("Error: Category not found for this service.", ephemeral=True)
+                return
+            category = guild.get_channel(category_id)
+            if not category:
+                await interaction.response.send_message("Error: Category not found.", ephemeral=True)
+                return
+            
+            # Create ticket channel
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+                guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
+            }
+            order_role = guild.get_role(ORDER_ROLE_ID)
+            if order_role:
+                overwrites[order_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            ticket_channel = await guild.create_text_channel(
+                f"unclaimed-{user.name}",
+                category=category,
+                overwrites=overwrites,
+                topic=f"{service_type} order ticket for {user.mention}"
+            )
+            await self.send_welcome_message(ticket_channel, user, service_type)
             await interaction.response.send_message(
-                f"You already have an open ticket: {existing_ticket.mention}",
+                f"Your {service_type} ticket has been created: {ticket_channel.mention}!",
                 ephemeral=True
             )
-            return
-        
-        # Get category
-        category_id = CATEGORY_IDS.get(service_type)
-        if not category_id:
-            await interaction.response.send_message("Error: Category not found for this service.", ephemeral=True)
-            return
-        category = guild.get_channel(category_id)
-        if not category:
-            await interaction.response.send_message("Error: Category not found.", ephemeral=True)
-            return
-        
-        # Create ticket channel
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
-        }
-        order_role = guild.get_role(ORDER_ROLE_ID)
-        if order_role:
-            overwrites[order_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-        ticket_channel = await guild.create_text_channel(
-            f"unclaimed-{user.name}",
-            category=category,
-            overwrites=overwrites,
-            topic=f"{service_type} order ticket for {user.mention}"
-        )
-        await self.send_welcome_message(ticket_channel, user, service_type)
-        await interaction.response.send_message(
-            f"Your {service_type} ticket has been created: {ticket_channel.mention}!",
-            ephemeral=True
-        )
+        except Exception as e:
+            print(f"Error creating ticket: {e}")
+            await interaction.response.send_message("An error occurred while creating your ticket. Please try again or contact support.", ephemeral=True)
 
     async def send_welcome_message(self, channel, user, service_type):
-        banner_urls = {
-            "Logo Design": "https://media.discordapp.net/attachments/1103870377211465818/1390404759684518020/pixelgraphics.png?ex=686822d7&is=6866d157&hm=fd9fb49a7196bad292b54329022df2526a958d4d04a0c44cf1241f1141a7af0a&=&format=webp&quality=lossless&width=2050&height=684",
-            "Clothing Design": "https://cdn.discordapp.com/attachments/1103870377211465818/1390404812062855441/pixelclothing.png?ex=686822e3&is=6866d163&hm=db3b2c0ed0041dfd253c525f366221c2df9a40707d6621b2d71b694d268e2f6d&",
-            "Livery": "https://media.discordapp.net/attachments/1103870377211465818/1390404760003416135/pixelliveries.png?ex=686822d7&is=6866d157&hm=eb1fda01e9743ef2f5ab19571c3920d10d55687b11a54bde21bc2584d85f5e58&=&format=webp&quality=lossless&width=2050&height=684",
-            "ELS": "https://media.discordapp.net/attachments/1103870377211465818/1390404759391043765/pixelels.png?ex=686822d7&is=6866d157&hm=66f156b4b222235c543ba34ff531dbb86f6c5cc7f8daa0ea8127a6d9dd4dce89&=&format=webp&quality=lossless&width=2050&height=684",
-            "Banner and Graphics": "https://media.discordapp.net/attachments/1103870377211465818/1390404759684518020/pixelgraphics.png?ex=686822d7&is=6866d157&hm=fd9fb49a7196bad292b54329022df2526a958d4d04a0c44cf1241f1141a7af0a&=&format=webp&quality=lossless&width=2050&height=684",
-            "Full Discord Server Design": "https://media.discordapp.net/attachments/1103870377211465818/1390404812373495979/pixeldiscord.png?ex=686822e3&is=6866d163&hm=78d99a12f6715acb0faea5d36d249ff0a96d93cf83b2ec96501202cead3b46dd&=&format=webp&quality=lossless&width=2050&height=684",
-            "Professional Photography": "https://media.discordapp.net/attachments/1103870377211465818/1390404846238044262/pixelphotos.png?ex=686822eb&is=6866d16b&hm=5fbdd76fe7dad1d586572a80362f61488a670be7301b9681ddfb0651d5fcaddc&=&format=webp&quality=lossless&width=2050&height=684"
-        }
-        banner_url = banner_urls.get(service_type, "https://example.com/default_banner.png")
-        
-        # Get designer role ping
-        designer_role_id = DESIGNER_ROLE_PINGS.get(service_type)
-        designer_role_mention = ""
-        if designer_role_id:
-            designer_role = channel.guild.get_role(designer_role_id)
-            if designer_role:
-                designer_role_mention = designer_role.mention
-        
-        embed = discord.Embed(
-            title=f"Welcome to your custom {service_type} order ticket!",
-            description=(
-                f"Thank you for choosing .pixel, {user.mention}! 🎨\n\n"
-                f"We're excited to bring your vision to life with our professional {service_type.lower()} services.\n\n"
-                f"**To start, please fill out the form below and provide these details:**\n\n"
-                f"**📋 Type:** (e.g., PD for liveries, server logo for graphics)\n"
-                f"**🎨 Customizations:** Detailed description including colors, style preferences, and specific requirements\n"
-                f"**📸 Reference(s):** Any images or examples that inspire your vision\n"
-                f"**💰 Budget Range:** (Optional) Your preferred budget range\n\n"
-                f"**Please reply with these details to begin your order process!**\n\n"
-                f"Our team will review your requirements and get back to you shortly."
-            ),
-            color=0x1B75BD,
-            timestamp=datetime.utcnow()
-        )
-        embed.set_footer(text=f".pixel Design Services • Professional Quality • Ticket ID: {channel.id}")
-        
-        # Add banner as embed image if available
-        if banner_url != "https://example.com/default_banner.png":
-            embed.set_image(url=banner_url)
-        
-        # Create ticket management view
-        ticket_view = TicketManagementView()
-        
-        # Send pings first
-        ping_message = f"Hey {user.mention}"
-        if designer_role_mention:
-            ping_message += f", {designer_role_mention} will be with you soon!"
-        else:
-            ping_message += ", our team will be with you soon!"
-        
-        await channel.send(ping_message)
-        
-        # Send embed with banner and management buttons
-        await channel.send(embed=embed, view=ticket_view)
-        
-        # Log ticket creation
-        await self.log_ticket_creation(channel, user, service_type)
+        try:
+            banner_urls = {
+                "Logo Design": "https://media.discordapp.net/attachments/1103870377211465818/1390404759684518020/pixelgraphics.png?ex=686822d7&is=6866d157&hm=fd9fb49a7196bad292b54329022df2526a958d4d04a0c44cf1241f1141a7af0a&=&format=webp&quality=lossless&width=2050&height=684",
+                "Clothing Design": "https://cdn.discordapp.com/attachments/1103870377211465818/1390404812062855441/pixelclothing.png?ex=686822e3&is=6866d163&hm=db3b2c0ed0041dfd253c525f366221c2df9a40707d6621b2d71b694d268e2f6d&",
+                "Livery": "https://media.discordapp.net/attachments/1103870377211465818/1390404760003416135/pixelliveries.png?ex=686822d7&is=6866d157&hm=eb1fda01e9743ef2f5ab19571c3920d10d55687b11a54bde21bc2584d85f5e58&=&format=webp&quality=lossless&width=2050&height=684",
+                "ELS": "https://media.discordapp.net/attachments/1103870377211465818/1390404759391043765/pixelels.png?ex=686822d7&is=6866d157&hm=66f156b4b222235c543ba34ff531dbb86f6c5cc7f8daa0ea8127a6d9dd4dce89&=&format=webp&quality=lossless&width=2050&height=684",
+                "Banner and Graphics": "https://media.discordapp.net/attachments/1103870377211465818/1390404759684518020/pixelgraphics.png?ex=686822d7&is=6866d157&hm=fd9fb49a7196bad292b54329022df2526a958d4d04a0c44cf1241f1141a7af0a&=&format=webp&quality=lossless&width=2050&height=684",
+                "Full Discord Server Design": "https://media.discordapp.net/attachments/1103870377211465818/1390404812373495979/pixeldiscord.png?ex=686822e3&is=6866d163&hm=78d99a12f6715acb0faea5d36d249ff0a96d93cf83b2ec96501202cead3b46dd&=&format=webp&quality=lossless&width=2050&height=684",
+                "Professional Photography": "https://media.discordapp.net/attachments/1103870377211465818/1390404846238044262/pixelphotos.png?ex=686822eb&is=6866d16b&hm=5fbdd76fe7dad1d586572a80362f61488a670be7301b9681ddfb0651d5fcaddc&=&format=webp&quality=lossless&width=2050&height=684"
+            }
+            banner_url = banner_urls.get(service_type, "https://example.com/default_banner.png")
+            
+            # Get designer role ping
+            designer_role_id = DESIGNER_ROLE_PINGS.get(service_type)
+            designer_role_mention = ""
+            if designer_role_id:
+                designer_role = channel.guild.get_role(designer_role_id)
+                if designer_role:
+                    designer_role_mention = designer_role.mention
+            
+            embed = discord.Embed(
+                title=f"Welcome to your custom {service_type} order ticket!",
+                description=(
+                    f"Thank you for choosing .pixel, {user.mention}! 🎨\n\n"
+                    f"We're excited to bring your vision to life with our professional {service_type.lower()} services.\n\n"
+                    f"**To start, please fill out the form below and provide these details:**\n\n"
+                    f"**📋 Type:** (e.g., PD for liveries, server logo for graphics)\n"
+                    f"**🎨 Customizations:** Detailed description including colors, style preferences, and specific requirements\n"
+                    f"**📸 Reference(s):** Any images or examples that inspire your vision\n"
+                    f"**💰 Budget Range:** (Optional) Your preferred budget range\n\n"
+                    f"**Please reply with these details to begin your order process!**\n\n"
+                    f"Our team will review your requirements and get back to you shortly."
+                ),
+                color=0x1B75BD,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=f".pixel Design Services • Professional Quality • Ticket ID: {channel.id}")
+            
+            # Add banner as embed image if available
+            if banner_url != "https://example.com/default_banner.png":
+                embed.set_image(url=banner_url)
+            
+            # Create ticket management view
+            ticket_view = TicketManagementView()
+            
+            # Send pings first
+            ping_message = f"Hey {user.mention}"
+            if designer_role_mention:
+                ping_message += f", {designer_role_mention} will be with you soon!"
+            else:
+                ping_message += ", our team will be with you soon!"
+            
+            await channel.send(ping_message)
+            
+            # Send embed with banner and management buttons
+            await channel.send(embed=embed, view=ticket_view)
+            
+            # Log ticket creation
+            await self.log_ticket_creation(channel, user, service_type)
+        except Exception as e:
+            print(f"Error sending welcome message: {e}")
+            # Try to send a simple message if the embed fails
+            try:
+                await channel.send(f"Welcome {user.mention}! Please provide your order details.")
+            except:
+                pass
     
     async def log_ticket_creation(self, channel, user, service_type):
         """Log ticket creation to the logging channel"""
@@ -350,6 +368,7 @@ class ServiceSelect(discord.ui.Select):
                 await logging_channel.send(embed=embed)
         except Exception as e:
             print(f"Error logging ticket creation: {e}")
+            # Don't fail the main interaction if logging fails
 
 class TicketManagementView(discord.ui.View):
     def __init__(self):
@@ -697,6 +716,7 @@ async def on_ready():
     bot.add_view(CloseConfirmationView())
     bot.add_view(PaymentLogView())
     bot.add_view(WelcomeView(0))  # Will be updated with actual member count
+    bot.add_view(ServiceSelectionView())  # Add ServiceSelectionView to persistent views
     
     # Sync slash commands to specific guild for faster propagation
     GUILD_ID = 1362585427093229709
