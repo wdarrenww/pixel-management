@@ -129,7 +129,7 @@ DESIGNER_ROLE_PINGS = {
 
 class ServiceSelectionView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=60)
+        super().__init__(timeout=None)  # Remove timeout for persistence
         # Add the service selection dropdown
         self.add_item(ServiceSelect())
     
