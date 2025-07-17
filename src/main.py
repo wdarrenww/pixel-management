@@ -3042,13 +3042,13 @@ class SupportTicketOrderView(discord.ui.View):
         
         embed.add_field(
             name="🔧 General Support",
-            value="• Basic questions and assistance\n• Account issues\n• General inquiries\n• Quick problem resolution",
+            value="• Basic questions and assistance\n• General inquiries\n• Quick problem resolution",
             inline=False
         )
         
         embed.add_field(
             name="⚡ High Rank Support",
-            value="• Complex technical issues\n• Escalated problems\n• Advanced troubleshooting\n• Specialized assistance",
+            value="• Complex technical issues\n• Escalated problems\n• Giveaways\n• Specialized assistance",
             inline=False
         )
         
@@ -3059,14 +3059,8 @@ class SupportTicketOrderView(discord.ui.View):
         )
         
         embed.add_field(
-            name="Response Times",
-            value="• General: 1-2 hours\n• High Rank: 30 minutes - 1 hour\n• Executive: 15-30 minutes",
-            inline=False
-        )
-        
-        embed.add_field(
             name="What to Include",
-            value="• Clear description of your issue\n• Any error messages\n• Steps to reproduce\n• Relevant screenshots",
+            value="• Clear description of your issue\n• Relevant screenshots",
             inline=False
         )
         
