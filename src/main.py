@@ -2026,19 +2026,13 @@ async def create_support_embed(ctx):
     
     embed.add_field(
         name="📋 What We Help With",
-        value="• Account issues and questions\n• Technical problems and errors\n• Service inquiries and clarifications\n• Complex troubleshooting\n• Policy and management concerns",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="⏱️ Response Times",
-        value="• General: 1-2 hours\n• High Rank: 30 minutes - 1 hour\n• Executive: 15-30 minutes",
+        value="• Account issues and questions\n• Product problems and errors\n• Service inquiries and clarifications\n• Policy and management concerns",
         inline=False
     )
     
     embed.add_field(
         name="💡 Tips for Faster Support",
-        value="• Be specific about your issue\n• Include error messages or codes\n• Provide steps to reproduce the problem\n• Add relevant screenshots when possible",
+        value="• Be specific about your issue\n• Add relevant screenshots when possible",
         inline=False
     )
     
