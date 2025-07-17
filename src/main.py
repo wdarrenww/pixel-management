@@ -1994,7 +1994,7 @@ async def create_support_embed(ctx):
         return
     
     # Check if command is used in the correct channel
-    if ctx.channel.id != TICKET_CHANNEL_ID:
+    if ctx.channel.id != 1362585428183613589:
         await ctx.message.delete()
         await ctx.send("This command can only be used in the designated channel.", delete_after=5)
         return
@@ -3115,7 +3115,7 @@ async def slash_create_support_embed(interaction: discord.Interaction):
         return
     
     # Check if command is used in the correct channel
-    if interaction.channel.id != TICKET_CHANNEL_ID:
+    if interaction.channel.id != 1362585428183613589:
         await interaction.response.send_message("This command can only be used in the designated channel.", ephemeral=True)
         return
     
