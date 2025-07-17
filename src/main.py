@@ -2044,9 +2044,6 @@ async def create_support_embed(ctx):
     
     embed.set_footer(text="Professional Support Services • We're here to help!")
     
-    # Add support image
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
-    
     # Send the embed with buttons
     await ctx.send(embed=embed, view=SupportTicketOrderView())
 
@@ -3160,9 +3157,6 @@ async def slash_create_support_embed(interaction: discord.Interaction):
     )
     
     embed.set_footer(text="Professional Support Services • We're here to help!")
-    
-    # Add support image
-    embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
     
     # Send the embed with buttons
     await interaction.response.send_message(embed=embed, view=SupportTicketOrderView())
