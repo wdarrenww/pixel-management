@@ -4576,8 +4576,146 @@ async def slash_department_stats(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@bot.tree.command(name="strike", description="Give a strike to a user (high privilege only)")
+@app_commands.describe(
+    user="The user to give a strike to",
+    reason="Reason for the strike"
+)
+async def slash_strike(interaction: discord.Interaction, user: discord.Member, reason: str):
+    """Give a strike to a user (slash command version)"""
+    # Check if user has high privilege
+    if not can_give_strike(interaction.user):
+        await interaction.response.send_message("You don't have permission to give strikes. Only high privilege users can give strikes.", ephemeral=True)
+        return
+    
+    # Check if trying to strike themselves
+    if user == interaction.user:
+        await interaction.response.send_message("You cannot give yourself a strike.", ephemeral=True)
+        return
+    
+    # Check if trying to strike another high privilege user
+    if can_give_strike(user):
+        await interaction.response.send_message("You cannot give strikes to other high privilege users.", ephemeral=True)
+        return
+    
+    success, message = await give_strike(user, interaction.user, reason)
+    
+    if success:
+        embed = discord.Embed(
+            title="⚠️ Strike Given",
+            description=f"Strike given to {user.mention}",
+            color=0xFF6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+        embed.add_field(name="Strike Count", value=f"{get_user_strike_count(user)}/3", inline=True)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.set_footer(text=f"Given by {interaction.user.name}")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    else:
+        await interaction.response.send_message(f"Error: {message}", ephemeral=True)
+
+@bot.command(name='strike')
+async def strike_prefix(ctx, user: discord.Member, *, reason: str):
+    """Give a strike to a user (prefix command version)"""
+    # Check if user has high privilege
+    if not can_give_strike(ctx.author):
+        await ctx.send("You don't have permission to give strikes. Only high privilege users can give strikes.")
+        return
+    
+    # Check if trying to strike themselves
+    if user == ctx.author:
+        await ctx.send("You cannot give yourself a strike.")
+        return
+    
+    # Check if trying to strike another high privilege user
+    if can_give_strike(user):
+        await ctx.send("You cannot give strikes to other high privilege users.")
+        return
+    
+    success, message = await give_strike(user, ctx.author, reason)
+    
+    if success:
+        embed = discord.Embed(
+            title="⚠️ Strike Given",
+            description=f"Strike given to {user.mention}",
+            color=0xFF6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+        embed.add_field(name="Strike Count", value=f"{get_user_strike_count(user)}/3", inline=True)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.set_footer(text=f"Given by {ctx.author.name}")
+        
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(f"Error: {message}")
+
+@bot.tree.command(name="strike-info", description="Check strike information for a user")
+@app_commands.describe(user="The user to check strikes for")
+async def slash_strike_info(interaction: discord.Interaction, user: discord.Member):
+    """Check strike information for a user (slash command version)"""
+    strike_count = get_user_strike_count(user)
+    
+    embed = discord.Embed(
+        title="⚠️ Strike Information",
+        description=f"Strike information for {user.mention}",
+        color=0xFF6B6B if strike_count > 0 else 0x6B8E6B,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+    embed.add_field(name="Strike Count", value=f"{strike_count}/3", inline=True)
+    
+    if strike_count == 0:
+        embed.add_field(name="Status", value="✅ No strikes", inline=True)
+    elif strike_count == 1:
+        embed.add_field(name="Status", value="⚠️ 1 strike", inline=True)
+    elif strike_count == 2:
+        embed.add_field(name="Status", value="⚠️ 2 strikes", inline=True)
+    else:
+        embed.add_field(name="Status", value="🚨 3 strikes (maximum)", inline=True)
+    
+    embed.set_footer(text=f"Checked by {interaction.user.name}")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.command(name='strike-info')
+async def strike_info_prefix(ctx, user: discord.Member):
+    """Check strike information for a user (prefix command version)"""
+    strike_count = get_user_strike_count(user)
+    
+    embed = discord.Embed(
+        title="⚠️ Strike Information",
+        description=f"Strike information for {user.mention}",
+        color=0xFF6B6B if strike_count > 0 else 0x6B8E6B,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+    embed.add_field(name="Strike Count", value=f"{strike_count}/3", inline=True)
+    
+    if strike_count == 0:
+        embed.add_field(name="Status", value="✅ No strikes", inline=True)
+    elif strike_count == 1:
+        embed.add_field(name="Status", value="⚠️ 1 strike", inline=True)
+    elif strike_count == 2:
+        embed.add_field(name="Status", value="⚠️ 2 strikes", inline=True)
+    else:
+        embed.add_field(name="Status", value="🚨 3 strikes (maximum)", inline=True)
+    
+    embed.set_footer(text=f"Checked by {ctx.author.name}")
+    
+    await ctx.send(embed=embed)
+
 # Promotion/Demotion system constants
-PROMOTION_LOG_CHANNEL_ID = 1395548061534650378
+PROMOTION_LOG_CHANNEL_ID = 1362585429227995184
+
+# Strike system role IDs
+STRIKE_1_ROLE_ID = 1362585427093229714
+STRIKE_2_ROLE_ID = 1362585427093229713
+STRIKE_3_ROLE_ID = 1362585427093229712
 
 # Role hierarchy definitions
 ROLE_HIERARCHY = {
@@ -4788,6 +4926,96 @@ async def log_trial_completion(target, new_role):
     except Exception as e:
         print(f"Error logging trial completion: {e}")
 
+def get_user_strike_count(user):
+    """Get the current strike count for a user"""
+    user_role_ids = [role.id for role in user.roles]
+    
+    if STRIKE_3_ROLE_ID in user_role_ids:
+        return 3
+    elif STRIKE_2_ROLE_ID in user_role_ids:
+        return 2
+    elif STRIKE_1_ROLE_ID in user_role_ids:
+        return 1
+    else:
+        return 0
+
+def can_give_strike(striker):
+    """Check if user can give strikes (high privileged users only)"""
+    striker_role_ids = [role.id for role in striker.roles]
+    
+    # Check for high rank roles (manager, executive, etc.)
+    high_privilege_roles = [
+        MANAGEMENT_REQUIRED_ROLE_ID,  # Manager
+        CO_EXECUTIVE_ROLE_ID,  # Co-executive
+    ]
+    
+    # Add head roles from each department
+    for department, roles in ROLE_HIERARCHY.items():
+        if "head" in roles:
+            high_privilege_roles.append(roles["head"])
+    
+    return any(role_id in striker_role_ids for role_id in high_privilege_roles)
+
+async def give_strike(target, striker, reason):
+    """Give a strike to a user"""
+    current_strikes = get_user_strike_count(target)
+    
+    if current_strikes >= 3:
+        return False, "User already has maximum strikes (3)"
+    
+    # Remove previous strike roles
+    strike_roles = [STRIKE_1_ROLE_ID, STRIKE_2_ROLE_ID, STRIKE_3_ROLE_ID]
+    for role_id in strike_roles:
+        role = target.guild.get_role(role_id)
+        if role and role in target.roles:
+            await target.remove_roles(role)
+    
+    # Add new strike role
+    new_strike_count = current_strikes + 1
+    if new_strike_count == 1:
+        strike_role = target.guild.get_role(STRIKE_1_ROLE_ID)
+    elif new_strike_count == 2:
+        strike_role = target.guild.get_role(STRIKE_2_ROLE_ID)
+    else:  # new_strike_count == 3
+        strike_role = target.guild.get_role(STRIKE_3_ROLE_ID)
+    
+    if strike_role:
+        await target.add_roles(strike_role)
+    
+    # Log the strike action
+    await log_strike_action(striker, target, reason, new_strike_count)
+    
+    return True, f"Strike {new_strike_count}/3 given successfully"
+
+async def log_strike_action(striker, target, reason, strike_count):
+    """Log strike actions in the promotion/demotion channel"""
+    try:
+        logging_channel = striker.guild.get_channel(PROMOTION_LOG_CHANNEL_ID)
+        if not logging_channel:
+            return
+        
+        embed = discord.Embed(
+            title="⚠️ Strike Given",
+            description=f"A user has been given a strike",
+            color=0xFF6B6B,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.add_field(name="Striker", value=f"{striker.mention} ({striker.name})", inline=True)
+        embed.add_field(name="Target", value=f"{target.mention} ({target.name})", inline=True)
+        embed.add_field(name="Strike Count", value=f"{strike_count}/3", inline=True)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        
+        if strike_count == 3:
+            embed.add_field(name="⚠️ Warning", value="This user has reached the maximum strike count!", inline=False)
+        
+        embed.set_footer(text=f"Strike ID: {striker.id}-{target.id}-{datetime.utcnow().timestamp()}")
+        
+        await logging_channel.send(embed=embed)
+        
+    except Exception as e:
+        print(f"Error logging strike action: {e}")
+
 @bot.command(name='hue')
 async def help_usage_embed(ctx):
     """Display comprehensive usage guide for all commands"""
@@ -4889,6 +5117,24 @@ async def help_usage_embed(ctx):
         inline=False
     )
     
+    # Strike System Commands
+    embed.add_field(
+        name="⚠️ **Strike System**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!strike <user> <reason>` - Give strike to user\n"
+            "• `!strike-info <user>` - Check user's strike count\n\n"
+            "**Slash Commands:**\n"
+            "• `/strike` - Give strike to user\n"
+            "• `/strike-info` - Check user's strike count\n\n"
+            "**Strike Levels:**\n"
+            "• Strike 1: Warning role\n"
+            "• Strike 2: Second warning role\n"
+            "• Strike 3: Final warning role (maximum)"
+        ),
+        inline=False
+    )
+    
     # Utility Commands
     embed.add_field(
         name="🔧 **Utility Commands**",
@@ -4932,6 +5178,7 @@ async def help_usage_embed(ctx):
             "**Design Commands:** Designer, Manager, or Executive roles\n"
             "**Support Commands:** Support, High Rank, or Executive roles\n"
             "**Management Commands:** Manager or Executive roles\n"
+            "**Strike Commands:** High privilege users only (Manager, Head, Executive)\n"
             "**Payment Commands:** Designer roles (payment log), All users (tax/review)\n"
             "**Utility Commands:** Varies by command"
         ),
