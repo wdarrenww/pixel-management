@@ -3755,7 +3755,7 @@ async def slash_resolve_support_ticket(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"Error resolving ticket: {str(e)}", ephemeral=True)
 
-@bot.command(name='de')
+@bot.command(name='delay')
 async def delay_explanation(ctx):
     """Send a professional delay explanation embed (privileged only)"""
     if not has_privileged_role(ctx.author):
