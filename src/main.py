@@ -4788,6 +4788,160 @@ async def log_trial_completion(target, new_role):
     except Exception as e:
         print(f"Error logging trial completion: {e}")
 
+@bot.command(name='hue')
+async def help_usage_embed(ctx):
+    """Display comprehensive usage guide for all commands"""
+    embed = discord.Embed(
+        title="📚 **Pixel Management Bot - Complete Command Guide**",
+        description="Comprehensive documentation for all available commands and features",
+        color=0x7289DA,
+        timestamp=datetime.utcnow()
+    )
+    
+    # Order Management Commands
+    embed.add_field(
+        name="🛒 **Order Management**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!oe` - Create order embed (role restricted)\n"
+            "• `!update-order-status <service> <status>` - Update service status\n"
+            "• `!order-status` - Show current order status\n"
+            "• `!os <designer> <customer> <details>` - Start order with details\n"
+            "• `!de` - Send design format reminder\n"
+            "• `!close` - Close current ticket\n"
+            "• `!we` - Workload explanation\n"
+            "• `!delay` - Send delay explanation\n"
+            "• `!eta-update <new_eta>` - Update completion time\n\n"
+            "**Slash Commands:**\n"
+            "• `/create-order-embed` - Create order embed\n"
+            "• `/update-order-status` - Update service status\n"
+            "• `/order-status` - Show order status\n"
+            "• `/order-start` - Start order with details\n"
+            "• `/design-reminder` - Send design reminder\n"
+            "• `/finished` - Mark order as finished\n"
+            "• `/delay-explanation` - Send delay explanation\n"
+            "• `/eta-update` - Update completion time"
+        ),
+        inline=False
+    )
+    
+    # Support Management Commands
+    embed.add_field(
+        name="🆘 **Support Management**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!se` - Create support embed\n"
+            "• `!resolved` - Mark support ticket as resolved\n\n"
+            "**Slash Commands:**\n"
+            "• `/create-support-embed` - Create support embed\n"
+            "• `/resolved` - Mark support ticket as resolved"
+        ),
+        inline=False
+    )
+    
+    # Ticket Management Commands
+    embed.add_field(
+        name="🎫 **Ticket Management**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!switch-claim <new_claimer>` - Switch ticket claim\n"
+            "• `!switch-order <new_designer>` - Switch order ownership\n\n"
+            "**Slash Commands:**\n"
+            "• `/switch-claim` - Switch ticket claim\n"
+            "• `/switch-order` - Switch order ownership"
+        ),
+        inline=False
+    )
+    
+    # Payment & Financial Commands
+    embed.add_field(
+        name="💰 **Payment & Financial**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!pl` - Log payment information\n"
+            "• `!tax <amount>` - Calculate Roblox tax (70% cut)\n"
+            "• `!review <designer> <rating> <remarks>` - Submit review\n\n"
+            "**Slash Commands:**\n"
+            "• `/payment-log` - Log payment information\n"
+            "• `/tax` - Calculate Roblox tax\n"
+            "• `/review` - Submit designer review"
+        ),
+        inline=False
+    )
+    
+    # Role Management Commands
+    embed.add_field(
+        name="👥 **Role Management**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!promote <user> <reason>` - Promote user\n"
+            "• `!demote <user> <reason>` - Demote user\n"
+            "• `!role-info <user>` - Get user role information\n"
+            "• `!role-hierarchy` - Show role hierarchy\n"
+            "• `!department-stats` - Show department statistics\n\n"
+            "**Slash Commands:**\n"
+            "• `/promote` - Promote user\n"
+            "• `/demote` - Demote user\n"
+            "• `/role-info` - Get user role information\n"
+            "• `/role-hierarchy` - Show role hierarchy\n"
+            "• `/department-stats` - Show department statistics"
+        ),
+        inline=False
+    )
+    
+    # Utility Commands
+    embed.add_field(
+        name="🔧 **Utility Commands**",
+        value=(
+            "**Prefix Commands:**\n"
+            "• `!sync` - Sync slash commands\n"
+            "• `!check-perms` - Check user permissions\n\n"
+            "**System Features:**\n"
+            "• Automatic ticket creation\n"
+            "• Persistent button views\n"
+            "• Role-based permissions\n"
+            "• Payment logging system\n"
+            "• Review system\n"
+            "• Support escalation"
+        ),
+        inline=False
+    )
+    
+    # Command Usage Examples
+    embed.add_field(
+        name="📝 **Usage Examples**",
+        value=(
+            "**Order Management:**\n"
+            "• `!os @designer @customer Logo Design - 500 RBX - 3 days`\n"
+            "• `!update-order-status logos delayed`\n"
+            "• `!eta-update 2 more days`\n\n"
+            "**Role Management:**\n"
+            "• `!promote @user Excellent performance`\n"
+            "• `!demote @user Inactive for 2 weeks`\n\n"
+            "**Payment:**\n"
+            "• `!tax 1000` (calculates ~1429 RBX needed)\n"
+            "• `!review @designer 5 Amazing work!`"
+        ),
+        inline=False
+    )
+    
+    # Role Requirements
+    embed.add_field(
+        name="🔐 **Role Requirements**",
+        value=(
+            "**Design Commands:** Designer, Manager, or Executive roles\n"
+            "**Support Commands:** Support, High Rank, or Executive roles\n"
+            "**Management Commands:** Manager or Executive roles\n"
+            "**Payment Commands:** Designer roles (payment log), All users (tax/review)\n"
+            "**Utility Commands:** Varies by command"
+        ),
+        inline=False
+    )
+    
+    embed.set_footer(text="Use !hue to display this guide • All commands support both prefix (!) and slash (/) formats")
+    
+    await ctx.send(embed=embed)
+
 # Run the bot
 if __name__ == "__main__":
     # Load token from environment variable or config file
