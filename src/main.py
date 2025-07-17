@@ -32,6 +32,14 @@ WELCOME_CHANNEL_ID = 1362585428850638903
 REVIEW_CHANNEL_ID = 1362585428850638900
 REVIEW_ROLE_ID = 1391506674896080926
 
+# Support system constants
+SUPPORT_ROLE_ID = 1362585427168592022
+EXECUTIVE_ROLE_ID = 1362585427621707999
+HIGH_RANK_ROLE_ID = 1362585427550146618
+SUPPORT_GENERAL_CATEGORY_ID = 1362585430024781936
+SUPPORT_HIGH_RANK_CATEGORY_ID = 1362585430024781937
+EXECUTIVE_CHANNEL_ID = 1362585430024781938
+
 # Consolidated role lists
 MANAGER_ROLE_IDS = [
     1362585427621707999,  # Original ORDER_ROLE_ID
@@ -49,6 +57,18 @@ DESIGNER_ROLE_IDS = [
     1362585427168592015,  # New designer role
     1362585427135168653,  # New designer role
     1362585427135168652   # New designer role
+]
+
+SUPPORT_ROLE_IDS = [
+    1362585427168592022,  # Support role
+]
+
+EXECUTIVE_ROLE_IDS = [
+    1362585427621707999,  # Executive role
+]
+
+HIGH_RANK_ROLE_IDS = [
+    1362585427550146618,  # High rank role
 ]
 
 # Store order details for payment logging
@@ -471,6 +491,10 @@ class CloseConfirmationView(discord.ui.View):
         )
         embed.set_footer(text=".pixel Design Services")
         await channel.send(embed=embed)
+        
+        # Send DM notification to ticket opener
+        await send_ticket_closure_dm(channel, interaction.user, "design ticket")
+        
         # Log closure
         await self.log_ticket_close(channel, interaction.user)
         await interaction.response.send_message("Ticket will be closed in 10 seconds.", ephemeral=True)
@@ -717,6 +741,11 @@ async def on_ready():
     bot.add_view(PaymentLogView())
     bot.add_view(WelcomeView(0))  # Will be updated with actual member count
     bot.add_view(ServiceSelectionView())  # Add ServiceSelectionView to persistent views
+    bot.add_view(SupportTicketOrderView())  # Add SupportTicketOrderView to persistent views
+    bot.add_view(SupportSelectionView())  # Add SupportSelectionView to persistent views
+    bot.add_view(SupportTicketView())  # Add SupportTicketView to persistent views
+    bot.add_view(SupportCloseConfirmationView())  # Add SupportCloseConfirmationView to persistent views
+    bot.add_view(EscalationView())  # Add EscalationView to persistent views
     
     # Sync slash commands to specific guild for faster propagation
     GUILD_ID = 1362585427093229709
@@ -1955,6 +1984,72 @@ async def workload_explanation(ctx):
     embed.set_footer(text=".pixel Design Services • We appreciate your patience!")
     await ctx.send(embed=embed)
 
+@bot.command(name='se')
+async def create_support_embed(ctx):
+    """Create the support embed (only for users with specific role)"""
+    # Check if user has the required role
+    if not has_support_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if command is used in the correct channel
+    if ctx.channel.id != TICKET_CHANNEL_ID:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in the designated channel.", delete_after=5)
+        return
+    
+    # Delete the command message
+    await ctx.message.delete()
+    
+    # Create the main support embed
+    embed = discord.Embed(
+        title="🎫 .pixel Support Center",
+        description=(
+            "Need help? We're here to assist you! \n\n"
+            "🔧 **Our Support Team**\n\n"
+            "• **Professional Support Staff**: Experienced team ready to help\n"
+            "• **Multiple Support Levels**: From general questions to complex issues\n"
+            "• **Quick Response Times**: We prioritize your concerns\n"
+            "• **Comprehensive Solutions**: We work to resolve issues completely\n"
+            "• **24/7 Availability**: Support when you need it\n\n"
+            "**Ready to get help?** \n\nClick the buttons below to create a support ticket or learn more about our support system."
+        ),
+        color=0x1B75BD,
+    )
+    
+    embed.add_field(
+        name="🔧 Support Types",
+        value="General Support • High Rank Support • Executive Support",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📋 What We Help With",
+        value="• Account issues and questions\n• Technical problems and errors\n• Service inquiries and clarifications\n• Complex troubleshooting\n• Policy and management concerns",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="⏱️ Response Times",
+        value="• General: 1-2 hours\n• High Rank: 30 minutes - 1 hour\n• Executive: 15-30 minutes",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💡 Tips for Faster Support",
+        value="• Be specific about your issue\n• Include error messages or codes\n• Provide steps to reproduce the problem\n• Add relevant screenshots when possible",
+        inline=False
+    )
+    
+    embed.set_footer(text="Professional Support Services • We're here to help!")
+    
+    # Add support image
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
+    
+    # Send the embed with buttons
+    await ctx.send(embed=embed, view=SupportTicketOrderView())
+
 def has_manager_role(user):
     """Check if user has any manager/executive role"""
     user_role_ids = [role.id for role in user.roles]
@@ -2418,6 +2513,2280 @@ async def log_review_submission_prefix(ctx, designer, rating):
             await logging_channel.send(embed=embed)
     except Exception as e:
         print(f"Error logging review submission: {e}")
+
+class WelcomeView(discord.ui.View):
+    def __init__(self, member_count: int):
+        super().__init__(timeout=None)
+        self.member_count = member_count
+    
+    @discord.ui.button(label="📋 Server Information", style=discord.ButtonStyle.primary, custom_id="server_info")
+    async def server_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "📋 **Server Information**\n\n"
+            "Welcome to .pixel! Here you'll find everything you need to know about our design services.\n\n"
+            "**Quick Links:**\n"
+            "• <#1362585428183613587> - Server information and rules\n"
+            "• <#1362585428510642325> - Order our design services\n"
+            "• <#1362585429706019031> - View our work and updates\n\n"
+            "Feel free to explore and ask any questions!",
+            ephemeral=True
+        )
+    
+    @discord.ui.button(label="👥 Member Count", style=discord.ButtonStyle.secondary, custom_id="member_count")
+    async def member_count(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"👥 **Current Member Count:** {self.member_count:,} members\n\n"
+            f"Thanks for being part of our growing community! 🎉",
+            ephemeral=True
+        )
+
+class SupportSelectionView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(SupportTypeSelect())
+    
+    custom_id = "support_selection_view"
+
+class SupportTypeSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="General Support",
+                description="General questions, account issues, or basic assistance",
+                value="general",
+                emoji="🔧",
+                default=False
+            ),
+            discord.SelectOption(
+                label="High Rank Support",
+                description="Complex issues, technical problems, or escalated matters",
+                value="high_rank",
+                emoji="⚡",
+                default=False
+            )
+        ]
+        
+        super().__init__(
+            placeholder="Select support type...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="support_type_select"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            support_type = self.values[0]
+            await self.create_support_ticket(interaction, support_type)
+        except Exception as e:
+            print(f"Error in SupportTypeSelect callback: {e}")
+            await interaction.response.send_message("An error occurred while processing your selection. Please try again.", ephemeral=True)
+    
+    async def create_support_ticket(self, interaction: discord.Interaction, support_type: str):
+        try:
+            guild = interaction.guild
+            user = interaction.user
+            
+            # Check if user already has an open support ticket
+            existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
+            if existing_ticket:
+                await interaction.response.send_message(
+                    f"You already have an open ticket: {existing_ticket.mention}",
+                    ephemeral=True
+                )
+                return
+            
+            # Determine category based on support type
+            if support_type == "general":
+                category_id = SUPPORT_GENERAL_CATEGORY_ID
+                category_name = "General Support"
+            else:  # high_rank
+                category_id = SUPPORT_HIGH_RANK_CATEGORY_ID
+                category_name = "High Rank Support"
+            
+            category = guild.get_channel(category_id)
+            if not category:
+                await interaction.response.send_message("Error: Support category not found.", ephemeral=True)
+                return
+            
+            # Create ticket channel
+            overwrites = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+                guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
+            }
+            
+            # Add support role permissions
+            support_role = guild.get_role(SUPPORT_ROLE_ID)
+            if support_role:
+                overwrites[support_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            
+            # Add executive role permissions
+            executive_role = guild.get_role(EXECUTIVE_ROLE_ID)
+            if executive_role:
+                overwrites[executive_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            
+            # Add high rank role permissions
+            high_rank_role = guild.get_role(HIGH_RANK_ROLE_ID)
+            if high_rank_role:
+                overwrites[high_rank_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            
+            ticket_channel = await guild.create_text_channel(
+                f"unclaimed-{user.name}",
+                category=category,
+                overwrites=overwrites,
+                topic=f"{category_name} ticket for {user.mention}"
+            )
+            
+            await self.send_support_welcome_message(ticket_channel, user, support_type)
+            await interaction.response.send_message(
+                f"Your {category_name} ticket has been created: {ticket_channel.mention}!",
+                ephemeral=True
+            )
+        except Exception as e:
+            print(f"Error creating support ticket: {e}")
+            await interaction.response.send_message("An error occurred while creating your ticket. Please try again or contact support.", ephemeral=True)
+
+    async def send_support_welcome_message(self, channel, user, support_type):
+        try:
+            # Get appropriate role mentions
+            support_role_mention = ""
+            if support_type == "general":
+                support_role = channel.guild.get_role(SUPPORT_ROLE_ID)
+                if support_role:
+                    support_role_mention = support_role.mention
+            else:  # high_rank
+                high_rank_role = channel.guild.get_role(HIGH_RANK_ROLE_ID)
+                if high_rank_role:
+                    support_role_mention = high_rank_role.mention
+            
+            embed = discord.Embed(
+                title=f"🎫 Welcome to your Support Ticket!",
+                description=(
+                    f"Hello {user.mention}! 👋\n\n"
+                    f"**Welcome to your support ticket!**\n\n"
+                    f"**📋 What happens next?**\n"
+                    f"• Our support team will be with you shortly\n"
+                    f"• Please describe your issue in detail\n"
+                    f"• Include any relevant information or screenshots\n"
+                    f"• We'll work to resolve your issue as quickly as possible\n\n"
+                    f"**💡 Tips for faster support:**\n"
+                    f"• Be specific about your issue\n"
+                    f"• Provide any error messages or codes\n"
+                    f"• Include steps to reproduce the problem\n"
+                    f"• Be patient - we'll get to you as soon as possible\n\n"
+                    f"**Support Type:** {support_type.replace('_', ' ').title()}\n\n"
+                    f"Thank you for reaching out to us! 🙏"
+                ),
+                color=0x1B75BD,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=f".pixel Support • Ticket ID: {channel.id}")
+            
+            # Create support ticket management view
+            support_view = SupportTicketView()
+            
+            # Send pings first
+            ping_message = f"Hey {user.mention}"
+            if support_role_mention:
+                ping_message += f", {support_role_mention} will be with you soon!"
+            else:
+                ping_message += ", our support team will be with you soon!"
+            
+            await channel.send(ping_message)
+            
+            # Send embed with management buttons
+            await channel.send(embed=embed, view=support_view)
+            
+            # Log ticket creation
+            await self.log_support_ticket_creation(channel, user, support_type)
+        except Exception as e:
+            print(f"Error sending support welcome message: {e}")
+            try:
+                await channel.send(f"Welcome {user.mention}! Please describe your issue.")
+            except:
+                pass
+    
+    async def log_support_ticket_creation(self, channel, user, support_type):
+        """Log support ticket creation to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="🎫 New Support Ticket Created",
+                    description=f"A new support ticket has been created",
+                    color=0x6B8E6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Support Type", value=support_type.replace('_', ' ').title(), inline=True)
+                embed.add_field(name="Channel", value=channel.mention, inline=True)
+                embed.add_field(name="Status", value="🟡 Unclaimed", inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging support ticket creation: {e}")
+
+class SupportTicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Claim Ticket", style=discord.ButtonStyle.success, custom_id="claim_support_ticket")
+    async def claim_support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has support role
+        if not has_support_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to claim support tickets.", ephemeral=True)
+            return
+        
+        channel = interaction.channel
+        
+        # Check if ticket is already claimed
+        if channel.name.startswith("claimed-"):
+            await interaction.response.send_message("This ticket has already been claimed.", ephemeral=True)
+            return
+        
+        # Rename channel
+        try:
+            await channel.edit(name=f"claimed-{interaction.user.name}")
+            
+            # Send claim message
+            embed = discord.Embed(
+                title="Ticket Claimed Successfully!",
+                description=f"{interaction.user.mention} has claimed this support ticket!",
+                color=0x6B8E6B,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Support")
+            
+            await channel.send(embed=embed)
+            
+            # Log claim
+            await self.log_support_ticket_claim(channel, interaction.user)
+            
+            # Disable claim button
+            button.disabled = True
+            button.label = "Claimed"
+            await interaction.response.edit_message(view=self)
+            
+        except Exception as e:
+            await interaction.response.send_message(f"Error claiming ticket: {e}", ephemeral=True)
+    
+    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="close_support_ticket")
+    async def close_support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has close privilege (support, high rank, or executive roles)
+        if not has_support_privileged_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to close support tickets.", ephemeral=True)
+            return
+        
+        # Create confirmation view
+        confirm_view = SupportCloseConfirmationView()
+        embed = discord.Embed(
+            title="⚠️ Confirm Ticket Closure",
+            description="Are you sure you want to close this support ticket? This action cannot be undone.",
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text="Click 'Confirm Close' to proceed")
+        await interaction.response.send_message(embed=embed, view=confirm_view, ephemeral=True)
+    
+    @discord.ui.button(label="Escalate", style=discord.ButtonStyle.primary, custom_id="escalate_support_ticket")
+    async def escalate_support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has support role
+        if not has_support_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to escalate support tickets.", ephemeral=True)
+            return
+        
+        # Create escalation view
+        escalation_view = EscalationView()
+        embed = discord.Embed(
+            title="📈 Escalate Ticket",
+            description="Select where to escalate this ticket:",
+            color=0x1B75BD,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text="Choose escalation destination")
+        await interaction.response.send_message(embed=embed, view=escalation_view, ephemeral=True)
+    
+    async def log_support_ticket_claim(self, channel, user):
+        """Log support ticket claim to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="🎯 Support Ticket Claimed",
+                    description=f"A support ticket has been claimed by a team member",
+                    color=0x6B8E6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Claimed By", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Channel", value=channel.mention, inline=True)
+                embed.add_field(name="Status", value="🟢 Claimed", inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging support ticket claim: {e}")
+
+class SupportCloseConfirmationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Confirm Close", style=discord.ButtonStyle.danger, custom_id="confirm_close_support")
+    async def confirm_close_support(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has close privilege (support, high rank, or executive roles)
+        if not has_support_privileged_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to close support tickets.", ephemeral=True)
+            return
+        
+        channel = interaction.channel
+        
+        # Send closing message
+        embed = discord.Embed(
+            title="🔒 Support Ticket Closing",
+            description="This support ticket will be closed in 10 seconds...",
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support")
+        await channel.send(embed=embed)
+        
+        # Send DM notification to ticket opener
+        await send_ticket_closure_dm(channel, interaction.user, "support ticket")
+        
+        # Log closure
+        await self.log_support_ticket_close(channel, interaction.user)
+        await interaction.response.send_message("Support ticket will be closed in 10 seconds.", ephemeral=True)
+        
+        # Close after delay
+        await asyncio.sleep(10)
+        await channel.delete()
+    
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="cancel_close_support")
+    async def cancel_close_support(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Support ticket closure cancelled.", ephemeral=True)
+    
+    async def log_support_ticket_close(self, channel, user):
+        """Log support ticket closure to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="🔒 Support Ticket Closed",
+                    description=f"A support ticket has been closed by a team member",
+                    color=0x8E6B6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Closed By", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Channel", value=f"#{channel.name}", inline=True)
+                embed.add_field(name="Status", value="🔴 Closed", inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging support ticket close: {e}")
+
+class EscalationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(EscalationSelect())
+    
+    custom_id = "escalation_view"
+
+class EscalationSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(
+                label="High Rank Support",
+                description="Escalate to high rank support team",
+                value="high_rank",
+                emoji="⚡",
+                default=False
+            ),
+            discord.SelectOption(
+                label="Executive",
+                description="Escalate to executive team",
+                value="executive",
+                emoji="👑",
+                default=False
+            )
+        ]
+        
+        super().__init__(
+            placeholder="Select escalation destination...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="escalation_select"
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            escalation_type = self.values[0]
+            await self.escalate_ticket(interaction, escalation_type)
+        except Exception as e:
+            print(f"Error in EscalationSelect callback: {e}")
+            await interaction.response.send_message("An error occurred while processing escalation. Please try again.", ephemeral=True)
+    
+    async def escalate_ticket(self, interaction: discord.Interaction, escalation_type: str):
+        try:
+            channel = interaction.channel
+            guild = channel.guild
+            
+            # Determine new category and role mentions
+            if escalation_type == "high_rank":
+                new_category_id = SUPPORT_HIGH_RANK_CATEGORY_ID
+                role_id = HIGH_RANK_ROLE_ID
+                escalation_name = "High Rank Support"
+                ping_message = "⚡ High Rank Support has been notified!"
+            else:  # executive
+                new_category_id = EXECUTIVE_CHANNEL_ID
+                role_id = EXECUTIVE_ROLE_ID
+                escalation_name = "Executive"
+                ping_message = "👑 Executive team has been notified!"
+            
+            # Get new category
+            new_category = guild.get_channel(new_category_id)
+            if not new_category:
+                await interaction.response.send_message("Error: Escalation category not found.", ephemeral=True)
+                return
+            
+            # Move channel to new category
+            await channel.edit(category=new_category)
+            
+            # Get role for pinging
+            role = guild.get_role(role_id)
+            role_mention = role.mention if role else ""
+            
+            # Send escalation notification
+            embed = discord.Embed(
+                title="📈 Ticket Escalated",
+                description=(
+                    f"This ticket has been escalated to **{escalation_name}**.\n\n"
+                    f"**Escalated by:** {interaction.user.mention}\n"
+                    f"**New category:** {new_category.name}\n\n"
+                    f"Please provide additional assistance as needed."
+                ),
+                color=0xFFA500,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Support • Escalation")
+            
+            # Send ping and embed
+            if role_mention:
+                await channel.send(f"{role_mention} {ping_message}")
+            await channel.send(embed=embed)
+            
+            # Log escalation
+            await self.log_ticket_escalation(channel, interaction.user, escalation_type)
+            
+            await interaction.response.send_message(f"Ticket escalated to {escalation_name} successfully!", ephemeral=True)
+            
+        except Exception as e:
+            print(f"Error escalating ticket: {e}")
+            await interaction.response.send_message(f"Error escalating ticket: {str(e)}", ephemeral=True)
+    
+    async def log_ticket_escalation(self, channel, user, escalation_type):
+        """Log ticket escalation to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="📈 Support Ticket Escalated",
+                    description=f"A support ticket has been escalated",
+                    color=0xFFA500,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Escalated By", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Channel", value=channel.mention, inline=True)
+                embed.add_field(name="Escalation Type", value=escalation_type.replace('_', ' ').title(), inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging ticket escalation: {e}")
+
+class SupportTicketOrderView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Create Support Ticket", style=discord.ButtonStyle.primary, custom_id="create_support_ticket")
+    async def create_support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user already has an open ticket
+        guild = interaction.guild
+        user = interaction.user
+        
+        existing_ticket = discord.utils.get(guild.channels, 
+                                          name=f"unclaimed-{user.name.lower()}")
+        if existing_ticket:
+            await interaction.response.send_message(
+                f"You already have an open ticket: {existing_ticket.mention}",
+                ephemeral=True
+            )
+            return
+        
+        # Show support type selection
+        embed = discord.Embed(
+            title="Select Support Type",
+            description="Please choose the type of support you need:",
+            color=0x1B75BD,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support • Choose your support type")
+        
+        await interaction.response.send_message(
+            embed=embed,
+            view=SupportSelectionView(),
+            ephemeral=True
+        )
+    
+    @discord.ui.button(label="Support Information", style=discord.ButtonStyle.secondary, custom_id="support_info")
+    async def support_info(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="Support Information",
+            description="How our support system works and what to expect.",
+            color=0x1B75BD,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.add_field(
+            name="🔧 General Support",
+            value="• Basic questions and assistance\n• Account issues\n• General inquiries\n• Quick problem resolution",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="⚡ High Rank Support",
+            value="• Complex technical issues\n• Escalated problems\n• Advanced troubleshooting\n• Specialized assistance",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="👑 Executive Support",
+            value="• Critical issues\n• Management concerns\n• Policy questions\n• Highest priority handling",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="Response Times",
+            value="• General: 1-2 hours\n• High Rank: 30 minutes - 1 hour\n• Executive: 15-30 minutes",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="What to Include",
+            value="• Clear description of your issue\n• Any error messages\n• Steps to reproduce\n• Relevant screenshots",
+            inline=False
+        )
+        
+        embed.set_footer(text=".pixel Support • We're here to help!")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+def has_privileged_role(user):
+    """Check if user has any manager or designer role"""
+    return has_manager_role(user) or has_designer_role(user)
+
+def has_support_role(user):
+    """Check if user has any support role"""
+    user_role_ids = [role.id for role in user.roles]
+    return any(role_id in user_role_ids for role_id in SUPPORT_ROLE_IDS)
+
+def has_support_privileged_role(user):
+    """Check if user has any support, high rank, or executive role"""
+    return has_support_role(user) or has_high_rank_role(user) or has_executive_role(user)
+
+def has_high_rank_role(user):
+    """Check if user has any high rank role"""
+    user_role_ids = [role.id for role in user.roles]
+    return any(role_id in user_role_ids for role_id in HIGH_RANK_ROLE_IDS)
+
+def has_executive_role(user):
+    """Check if user has any executive role"""
+    user_role_ids = [role.id for role in user.roles]
+    return any(role_id in user_role_ids for role_id in EXECUTIVE_ROLE_IDS)
+
+@bot.tree.command(name="create-support-embed", description="Create the support embed (role restricted)")
+async def slash_create_support_embed(interaction: discord.Interaction):
+    """Slash command version of -se"""
+    # Check if user has the required role
+    if not has_support_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if command is used in the correct channel
+    if interaction.channel.id != TICKET_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated channel.", ephemeral=True)
+        return
+    
+    # Create the main support embed
+    embed = discord.Embed(
+        title="🎫 .pixel Support Center",
+        description=(
+            "Need help? We're here to assist you! \n\n"
+            "🔧 **Our Support Team**\n\n"
+            "• **Professional Support Staff**: Experienced team ready to help\n"
+            "• **Multiple Support Levels**: From general questions to complex issues\n"
+            "• **Quick Response Times**: We prioritize your concerns\n"
+            "• **Comprehensive Solutions**: We work to resolve issues completely\n"
+            "• **24/7 Availability**: Support when you need it\n\n"
+            "**Ready to get help?** \n\nClick the buttons below to create a support ticket or learn more about our support system."
+        ),
+        color=0x1B75BD,
+    )
+    
+    embed.add_field(
+        name="🔧 Support Types",
+        value="General Support • High Rank Support • Executive Support",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📋 What We Help With",
+        value="• Account issues and questions\n• Technical problems and errors\n• Service inquiries and clarifications\n• Complex troubleshooting\n• Policy and management concerns",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="⏱️ Response Times",
+        value="• General: 1-2 hours\n• High Rank: 30 minutes - 1 hour\n• Executive: 15-30 minutes",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💡 Tips for Faster Support",
+        value="• Be specific about your issue\n• Include error messages or codes\n• Provide steps to reproduce the problem\n• Add relevant screenshots when possible",
+        inline=False
+    )
+    
+    embed.set_footer(text="Professional Support Services • We're here to help!")
+    
+    # Add support image
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1103870377211465818/1390403855019409528/pixeldiscordorder.png?ex=686821ff&is=6866d07f&hm=d76f95b0cb1cc72a5be4e86243b44b7504c6bbecd2c275c2b96ae0b94a939354")
+    
+    # Send the embed with buttons
+    await interaction.response.send_message(embed=embed, view=SupportTicketOrderView())
+
+@bot.tree.command(name="switch-claim", description="Switch the claim of a ticket to another person (support/design tickets)")
+@app_commands.describe(new_claimer="The new person to claim the ticket")
+async def slash_switch_claim(interaction: discord.Interaction, new_claimer: discord.Member):
+    """Slash command version of -switch-claim"""
+    # Check if user has the required role
+    if not has_privileged_role(interaction.user) and not has_support_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if this is a ticket channel
+    if not (interaction.channel.name.startswith('unclaimed-') or interaction.channel.name.startswith('claimed-')):
+        await interaction.response.send_message("This command can only be used in ticket channels.", ephemeral=True)
+        return
+    
+    # Check if new claimer has appropriate roles
+    is_design_ticket = interaction.channel.category and interaction.channel.category.id in DESIGN_CATEGORY_IDS
+    is_support_ticket = interaction.channel.category and (interaction.channel.category.id == SUPPORT_GENERAL_CATEGORY_ID or 
+                                                         interaction.channel.category.id == SUPPORT_HIGH_RANK_CATEGORY_ID or
+                                                         interaction.channel.category.id == EXECUTIVE_CHANNEL_ID)
+    
+    if is_design_ticket and not has_designer_role(new_claimer):
+        await interaction.response.send_message("The new claimer must have designer roles for design tickets.", ephemeral=True)
+        return
+    
+    if is_support_ticket and not has_support_role(new_claimer):
+        await interaction.response.send_message("The new claimer must have support roles for support tickets.", ephemeral=True)
+        return
+    
+    # Get current claimer from channel name
+    current_claimer_name = None
+    if interaction.channel.name.startswith('claimed-'):
+        current_claimer_name = interaction.channel.name.split('-', 1)[1]
+    
+    # Rename channel
+    try:
+        await interaction.channel.edit(name=f"claimed-{new_claimer.name}")
+        
+        # Create switch claim embed
+        embed = discord.Embed(
+            title="🔄 Ticket Claim Switched",
+            description=(
+                f"This ticket has been reassigned to a new team member.\n\n"
+                f"**Previous Claimer:** {current_claimer_name if current_claimer_name else 'Unclaimed'}\n"
+                f"**New Claimer:** {new_claimer.mention} ({new_claimer.name})\n"
+                f"**Switched by:** {interaction.user.mention} ({interaction.user.name})\n\n"
+                f"Please continue working on this ticket."
+            ),
+            color=0x1B75BD,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support • Ticket Management")
+        
+        await interaction.channel.send(embed=embed)
+        
+        # Log the switch
+        await log_claim_switch(interaction.channel, interaction.user, new_claimer, current_claimer_name)
+        
+        await interaction.response.send_message("✅ Ticket claim switched successfully!", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.response.send_message(f"Error switching claim: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="switch-order", description="Switch the order ownership to a new designer (design tickets only)")
+@app_commands.describe(new_designer="The new designer to take ownership of the order")
+async def slash_switch_order_ownership(interaction: discord.Interaction, new_designer: discord.Member):
+    """Slash command version of -switch-order"""
+    # Check if user has the required role
+    if not has_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if this is a design ticket
+    if not interaction.channel.category or interaction.channel.category.id not in DESIGN_CATEGORY_IDS:
+        await interaction.response.send_message("This command can only be used in design ticket channels.", ephemeral=True)
+        return
+    
+    # Check if this is a ticket channel
+    if not (interaction.channel.name.startswith('unclaimed-') or interaction.channel.name.startswith('claimed-')):
+        await interaction.response.send_message("This command can only be used in ticket channels.", ephemeral=True)
+        return
+    
+    # Check if new designer has designer roles
+    if not has_designer_role(new_designer):
+        await interaction.response.send_message("The new designer must have designer roles.", ephemeral=True)
+        return
+    
+    # Get current designer from channel name
+    current_designer_name = None
+    if interaction.channel.name.startswith('claimed-'):
+        current_designer_name = interaction.channel.name.split('-', 1)[1]
+    
+    # Update order details if they exist
+    old_designer = None
+    if interaction.channel.id in order_details:
+        old_designer = order_details[interaction.channel.id]['designer']
+        order_details[interaction.channel.id]['designer'] = new_designer
+    
+    # Rename channel
+    try:
+        await interaction.channel.edit(name=f"claimed-{new_designer.name}")
+        
+        # Create switch order embed
+        embed = discord.Embed(
+            title="🎨 Order Ownership Transferred",
+            description=(
+                f"This order has been transferred to a new designer.\n\n"
+                f"**Previous Designer:** {current_designer_name if current_designer_name else 'Unclaimed'}\n"
+                f"**New Designer:** {new_designer.mention} ({new_designer.name})\n"
+                f"**Transferred by:** {interaction.user.mention} ({interaction.user.name})\n\n"
+                f"**Order Details Updated:**\n"
+                f"• Payment will now be logged to {new_designer.mention}\n"
+                f"• All future order actions will be attributed to the new designer\n\n"
+                f"Please continue working on this order with the same dedication and quality."
+            ),
+            color=0x00FF00,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Design Services • Order Management")
+        
+        await interaction.channel.send(embed=embed)
+        
+        # Log the switch
+        await log_order_ownership_switch(interaction.channel, interaction.user, new_designer, old_designer, current_designer_name)
+        
+        await interaction.response.send_message("✅ Order ownership switched successfully!", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.response.send_message(f"Error switching order ownership: {str(e)}", ephemeral=True)
+
+async def log_claim_switch(channel, switcher, new_claimer, old_claimer_name):
+    """Log claim switch to the logging channel"""
+    try:
+        logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+        if logging_channel:
+            embed = discord.Embed(
+                title="🔄 Ticket Claim Switched",
+                description=f"A ticket claim has been switched to a new team member",
+                color=0x1B75BD,
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Switched By", value=f"{switcher.mention} ({switcher.name})", inline=True)
+            embed.add_field(name="New Claimer", value=f"{new_claimer.mention} ({new_claimer.name})", inline=True)
+            embed.add_field(name="Channel", value=channel.mention, inline=True)
+            embed.add_field(name="Previous Claimer", value=old_claimer_name if old_claimer_name else "Unclaimed", inline=True)
+            embed.set_footer(text=f"Ticket ID: {channel.id}")
+            
+            await logging_channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error logging claim switch: {e}")
+
+async def log_order_ownership_switch(channel, switcher, new_designer, old_designer, old_designer_name):
+    """Log order ownership switch to the logging channel"""
+    try:
+        logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+        if logging_channel:
+            embed = discord.Embed(
+                title="🎨 Order Ownership Transferred",
+                description=f"An order has been transferred to a new designer",
+                color=0x00FF00,
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Transferred By", value=f"{switcher.mention} ({switcher.name})", inline=True)
+            embed.add_field(name="New Designer", value=f"{new_designer.mention} ({new_designer.name})", inline=True)
+            embed.add_field(name="Channel", value=channel.mention, inline=True)
+            embed.add_field(name="Previous Designer", value=old_designer_name if old_designer_name else "Unclaimed", inline=True)
+            if old_designer:
+                embed.add_field(name="Old Designer Object", value=f"{old_designer.mention} ({old_designer.name})", inline=True)
+            embed.set_footer(text=f"Ticket ID: {channel.id}")
+            
+            await logging_channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error logging order ownership switch: {e}")
+
+async def find_ticket_opener(channel):
+    """Find the user who opened the ticket based on channel name"""
+    try:
+        # Extract username from channel name (works for both unclaimed- and claimed- prefixes)
+        if channel.name.startswith('unclaimed-'):
+            username = channel.name.split('-', 1)[1]
+        elif channel.name.startswith('claimed-'):
+            username = channel.name.split('-', 1)[1]
+        elif channel.name.startswith('finished-'):
+            username = channel.name.split('-', 1)[1]
+        elif channel.name.startswith('resolved-'):
+            username = channel.name.split('-', 1)[1]
+        else:
+            return None
+        
+        # Find the user in the guild
+        for member in channel.guild.members:
+            if member.name.lower() == username.lower():
+                return member
+        
+        return None
+    except Exception as e:
+        print(f"Error finding ticket opener: {e}")
+        return None
+
+async def send_ticket_closure_dm(channel, closer, ticket_type="ticket"):
+    """Send DM notification to ticket opener about ticket closure"""
+    try:
+        ticket_opener = await find_ticket_opener(channel)
+        if not ticket_opener:
+            print(f"Could not find ticket opener for channel {channel.name}")
+            return
+        
+        embed = discord.Embed(
+            title=f"🔒 Your {ticket_type.title()} Has Been Closed",
+            description=(
+                f"Hello {ticket_opener.mention}!\n\n"
+                f"Your {ticket_type} has been closed by our team.\n\n"
+                f"**Ticket Details:**\n"
+                f"• **Channel:** #{channel.name}\n"
+                f"• **Closed by:** {closer.mention} ({closer.name})\n"
+                f"• **Closure Time:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
+                f"Thank you for using our services! If you have any further questions or need additional assistance, please don't hesitate to create a new ticket.\n\n"
+                f"We appreciate your business and hope to serve you again soon! 🙏"
+            ),
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=f".pixel {'Support' if 'support' in ticket_type.lower() else 'Design Services'} • Ticket ID: {channel.id}")
+        
+        try:
+            await ticket_opener.send(embed=embed)
+            print(f"Sent closure DM to {ticket_opener.name} for ticket {channel.name}")
+        except discord.Forbidden:
+            print(f"Could not send DM to {ticket_opener.name} - DMs disabled")
+        except Exception as e:
+            print(f"Error sending DM to {ticket_opener.name}: {e}")
+            
+    except Exception as e:
+        print(f"Error in send_ticket_closure_dm: {e}")
+
+@bot.command(name='switch-claim')
+async def switch_claim(ctx, new_claimer: discord.Member):
+    """Switch the claim of a ticket to another person (support/design tickets)"""
+    # Check if user has the required role
+    if not has_privileged_role(ctx.author) and not has_support_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if this is a ticket channel
+    if not (ctx.channel.name.startswith('unclaimed-') or ctx.channel.name.startswith('claimed-')):
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in ticket channels.", delete_after=5)
+        return
+    
+    # Check if new claimer has appropriate roles
+    is_design_ticket = ctx.channel.category and ctx.channel.category.id in DESIGN_CATEGORY_IDS
+    is_support_ticket = ctx.channel.category and (ctx.channel.category.id == SUPPORT_GENERAL_CATEGORY_ID or 
+                                                 ctx.channel.category.id == SUPPORT_HIGH_RANK_CATEGORY_ID or
+                                                 ctx.channel.category.id == EXECUTIVE_CHANNEL_ID)
+    
+    if is_design_ticket and not has_designer_role(new_claimer):
+        await ctx.message.delete()
+        await ctx.send("The new claimer must have designer roles for design tickets.", delete_after=5)
+        return
+    
+    if is_support_ticket and not has_support_role(new_claimer):
+        await ctx.message.delete()
+        await ctx.send("The new claimer must have support roles for support tickets.", delete_after=5)
+        return
+    
+    # Get current claimer from channel name
+    current_claimer_name = None
+    if ctx.channel.name.startswith('claimed-'):
+        current_claimer_name = ctx.channel.name.split('-', 1)[1]
+    
+    # Rename channel
+    try:
+        await ctx.channel.edit(name=f"claimed-{new_claimer.name}")
+        
+        # Create switch claim embed
+        embed = discord.Embed(
+            title="🔄 Ticket Claim Switched",
+            description=(
+                f"This ticket has been reassigned to a new team member.\n\n"
+                f"**Previous Claimer:** {current_claimer_name if current_claimer_name else 'Unclaimed'}\n"
+                f"**New Claimer:** {new_claimer.mention} ({new_claimer.name})\n"
+                f"**Switched by:** {ctx.author.mention} ({ctx.author.name})\n\n"
+                f"Please continue working on this ticket."
+            ),
+            color=0x1B75BD,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support • Ticket Management")
+        
+        await ctx.channel.send(embed=embed)
+        
+        # Log the switch
+        await log_claim_switch(ctx.channel, ctx.author, new_claimer, current_claimer_name)
+        
+        await ctx.message.delete()
+        await ctx.send("✅ Ticket claim switched successfully!", delete_after=3)
+        
+    except Exception as e:
+        await ctx.message.delete()
+        await ctx.send(f"Error switching claim: {str(e)}", delete_after=5)
+
+@bot.command(name='switch-order')
+async def switch_order_ownership(ctx, new_designer: discord.Member):
+    """Switch the order ownership to a new designer (design tickets only)"""
+    # Check if user has the required role
+    if not has_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if this is a design ticket
+    if not ctx.channel.category or ctx.channel.category.id not in DESIGN_CATEGORY_IDS:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in design ticket channels.", delete_after=5)
+        return
+    
+    # Check if this is a ticket channel
+    if not (ctx.channel.name.startswith('unclaimed-') or ctx.channel.name.startswith('claimed-')):
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in ticket channels.", delete_after=5)
+        return
+    
+    # Check if new designer has designer roles
+    if not has_designer_role(new_designer):
+        await ctx.message.delete()
+        await ctx.send("The new designer must have designer roles.", delete_after=5)
+        return
+    
+    # Get current designer from channel name
+    current_designer_name = None
+    if ctx.channel.name.startswith('claimed-'):
+        current_designer_name = ctx.channel.name.split('-', 1)[1]
+    
+    # Update order details if they exist
+    old_designer = None
+    if ctx.channel.id in order_details:
+        old_designer = order_details[ctx.channel.id]['designer']
+        order_details[ctx.channel.id]['designer'] = new_designer
+    
+    # Rename channel
+    try:
+        await ctx.channel.edit(name=f"claimed-{new_designer.name}")
+        
+        # Create switch order embed
+        embed = discord.Embed(
+            title="🎨 Order Ownership Transferred",
+            description=(
+                f"This order has been transferred to a new designer.\n\n"
+                f"**Previous Designer:** {current_designer_name if current_designer_name else 'Unclaimed'}\n"
+                f"**New Designer:** {new_designer.mention} ({new_designer.name})\n"
+                f"**Transferred by:** {ctx.author.mention} ({ctx.author.name})\n\n"
+                f"**Order Details Updated:**\n"
+                f"• Payment will now be logged to {new_designer.mention}\n"
+                f"• All future order actions will be attributed to the new designer\n\n"
+                f"Please continue working on this order with the same dedication and quality."
+            ),
+            color=0x00FF00,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Design Services • Order Management")
+        
+        await ctx.channel.send(embed=embed)
+        
+        # Log the switch
+        await log_order_ownership_switch(ctx.channel, ctx.author, new_designer, old_designer, current_designer_name)
+        
+        await ctx.message.delete()
+        await ctx.send("✅ Order ownership switched successfully!", delete_after=3)
+        
+    except Exception as e:
+        await ctx.message.delete()
+        await ctx.send(f"Error switching order ownership: {str(e)}", delete_after=5)
+
+@bot.command(name='resolved')
+async def resolve_support_ticket(ctx):
+    """Mark the support ticket as resolved and rename the channel (support staff only)"""
+    # Check if user has support privilege (support, high rank, or executive roles)
+    if not has_support_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to resolve support tickets.", delete_after=5)
+        return
+    
+    channel = ctx.channel
+    
+    # Only allow in support ticket categories
+    is_support_ticket = channel.category and (channel.category.id == SUPPORT_GENERAL_CATEGORY_ID or 
+                                             channel.category.id == SUPPORT_HIGH_RANK_CATEGORY_ID or
+                                             channel.category.id == EXECUTIVE_CHANNEL_ID)
+    
+    if not is_support_ticket:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in support ticket channels.", delete_after=5)
+        return
+    
+    # Check if this is a ticket channel
+    if not (channel.name.startswith('unclaimed-') or channel.name.startswith('claimed-')):
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in ticket channels.", delete_after=5)
+        return
+    
+    # Get ticket opener from channel name
+    ticket_opener_name = None
+    if channel.name.startswith('unclaimed-'):
+        ticket_opener_name = channel.name.split('-', 1)[1]
+    elif channel.name.startswith('claimed-'):
+        ticket_opener_name = channel.name.split('-', 1)[1]
+    
+    if not ticket_opener_name:
+        await ctx.message.delete()
+        await ctx.send("Could not determine ticket opener from channel name.", delete_after=5)
+        return
+    
+    # Rename the channel to resolved-username
+    try:
+        await channel.edit(name=f"resolved-{ticket_opener_name}")
+        
+        # Send resolution message
+        embed = discord.Embed(
+            title="✅ Support Ticket Resolved!",
+            description=(
+                f"**This support ticket has been marked as resolved!** 🎉\n\n"
+                f"We're glad we could help you with your issue.\n\n"
+                f"**Resolution Details:**\n"
+                f"• **Resolved by:** {ctx.author.mention} ({ctx.author.name})\n"
+                f"• **Resolution Time:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                f"• **Ticket ID:** {channel.id}\n\n"
+                f"**What happens next?**\n"
+                f"• This ticket will remain open for reference\n"
+                f"• You can continue to ask questions if needed\n"
+                f"• Feel free to create a new ticket for any new issues\n\n"
+                f"Thank you for reaching out to us! We appreciate your patience and hope we resolved your issue satisfactorily. 🙏"
+            ),
+            color=0x6B8E6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support • Issue Resolved")
+        
+        await channel.send(embed=embed)
+        
+        # Send DM notification to ticket opener
+        await send_support_resolution_dm(channel, ctx.author, ticket_opener_name)
+        
+        # Log the resolution
+        await log_support_ticket_resolution(channel, ctx.author, ticket_opener_name)
+        
+        await ctx.message.delete()
+        await ctx.send("✅ Support ticket marked as resolved!", delete_after=3)
+        
+    except Exception as e:
+        await ctx.message.delete()
+        await ctx.send(f"Error resolving ticket: {str(e)}", delete_after=5)
+
+async def send_support_resolution_dm(channel, resolver, ticket_opener_name):
+    """Send DM notification to ticket opener about ticket resolution"""
+    try:
+        ticket_opener = await find_ticket_opener(channel)
+        if not ticket_opener:
+            print(f"Could not find ticket opener {ticket_opener_name} for channel {channel.name}")
+            return
+        
+        embed = discord.Embed(
+            title="✅ Your Support Ticket Has Been Resolved!",
+            description=(
+                f"Hello {ticket_opener.mention}!\n\n"
+                f"Great news! Your support ticket has been marked as resolved.\n\n"
+                f"**Resolution Details:**\n"
+                f"• **Channel:** #{channel.name}\n"
+                f"• **Resolved by:** {resolver.mention} ({resolver.name})\n"
+                f"• **Resolution Time:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                f"• **Ticket ID:** {channel.id}\n\n"
+                f"**What this means:**\n"
+                f"• Your issue has been addressed and resolved\n"
+                f"• The ticket remains open for your reference\n"
+                f"• You can continue to ask follow-up questions if needed\n"
+                f"• Feel free to create a new ticket for any new issues\n\n"
+                f"Thank you for your patience and for choosing .pixel Support! 🙏\n\n"
+                f"If you have any feedback about your support experience, we'd love to hear it!"
+            ),
+            color=0x6B8E6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support • Issue Resolved")
+        
+        try:
+            await ticket_opener.send(embed=embed)
+            print(f"Sent resolution DM to {ticket_opener.name} for ticket {channel.name}")
+        except discord.Forbidden:
+            print(f"Could not send DM to {ticket_opener.name} - DMs disabled")
+        except Exception as e:
+            print(f"Error sending DM to {ticket_opener.name}: {e}")
+            
+    except Exception as e:
+        print(f"Error in send_support_resolution_dm: {e}")
+
+async def log_support_ticket_resolution(channel, resolver, ticket_opener_name):
+    """Log support ticket resolution to the logging channel"""
+    try:
+        logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+        if logging_channel:
+            embed = discord.Embed(
+                title="✅ Support Ticket Resolved",
+                description=f"A support ticket has been marked as resolved",
+                color=0x6B8E6B,
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Resolved By", value=f"{resolver.mention} ({resolver.name})", inline=True)
+            embed.add_field(name="Channel", value=channel.mention, inline=True)
+            embed.add_field(name="Ticket Opener", value=ticket_opener_name, inline=True)
+            embed.add_field(name="Status", value="✅ Resolved", inline=True)
+            embed.set_footer(text=f"Ticket ID: {channel.id}")
+            
+            await logging_channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error logging support ticket resolution: {e}")
+
+@bot.tree.command(name="resolved", description="Mark the support ticket as resolved (support staff only)")
+async def slash_resolve_support_ticket(interaction: discord.Interaction):
+    """Slash command version of -resolved"""
+    # Check if user has support privilege (support, high rank, or executive roles)
+    if not has_support_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to resolve support tickets.", ephemeral=True)
+        return
+    
+    channel = interaction.channel
+    
+    # Only allow in support ticket categories
+    is_support_ticket = channel.category and (channel.category.id == SUPPORT_GENERAL_CATEGORY_ID or 
+                                             channel.category.id == SUPPORT_HIGH_RANK_CATEGORY_ID or
+                                             channel.category.id == EXECUTIVE_CHANNEL_ID)
+    
+    if not is_support_ticket:
+        await interaction.response.send_message("This command can only be used in support ticket channels.", ephemeral=True)
+        return
+    
+    # Check if this is a ticket channel
+    if not (channel.name.startswith('unclaimed-') or channel.name.startswith('claimed-')):
+        await interaction.response.send_message("This command can only be used in ticket channels.", ephemeral=True)
+        return
+    
+    # Get ticket opener from channel name
+    ticket_opener_name = None
+    if channel.name.startswith('unclaimed-'):
+        ticket_opener_name = channel.name.split('-', 1)[1]
+    elif channel.name.startswith('claimed-'):
+        ticket_opener_name = channel.name.split('-', 1)[1]
+    
+    if not ticket_opener_name:
+        await interaction.response.send_message("Could not determine ticket opener from channel name.", ephemeral=True)
+        return
+    
+    # Rename the channel to resolved-username
+    try:
+        await channel.edit(name=f"resolved-{ticket_opener_name}")
+        
+        # Send resolution message
+        embed = discord.Embed(
+            title="✅ Support Ticket Resolved!",
+            description=(
+                f"**This support ticket has been marked as resolved!** 🎉\n\n"
+                f"We're glad we could help you with your issue.\n\n"
+                f"**Resolution Details:**\n"
+                f"• **Resolved by:** {interaction.user.mention} ({interaction.user.name})\n"
+                f"• **Resolution Time:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                f"• **Ticket ID:** {channel.id}\n\n"
+                f"**What happens next?**\n"
+                f"• This ticket will remain open for reference\n"
+                f"• You can continue to ask questions if needed\n"
+                f"• Feel free to create a new ticket for any new issues\n\n"
+                f"Thank you for reaching out to us! We appreciate your patience and hope we resolved your issue satisfactorily. 🙏"
+            ),
+            color=0x6B8E6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Support • Issue Resolved")
+        
+        await channel.send(embed=embed)
+        
+        # Send DM notification to ticket opener
+        await send_support_resolution_dm(channel, interaction.user, ticket_opener_name)
+        
+        # Log the resolution
+        await log_support_ticket_resolution(channel, interaction.user, ticket_opener_name)
+        
+        await interaction.response.send_message("✅ Support ticket marked as resolved!", ephemeral=True)
+        
+    except Exception as e:
+        await interaction.response.send_message(f"Error resolving ticket: {str(e)}", ephemeral=True)
+
+@bot.command(name='de')
+async def delay_explanation(ctx):
+    """Send a professional delay explanation embed (privileged only)"""
+    if not has_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if this is a design ticket
+    if not ctx.channel.category or ctx.channel.category.id not in DESIGN_CATEGORY_IDS:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in design ticket channels.", delete_after=5)
+        return
+    
+    # Check if this is a ticket channel
+    if not (ctx.channel.name.startswith('unclaimed-') or ctx.channel.name.startswith('claimed-')):
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in ticket channels.", delete_after=5)
+        return
+    
+    await ctx.message.delete()
+    
+    embed = discord.Embed(
+        title="⏳ Order Update: We Appreciate Your Patience!",
+        description=(
+            "Hello! 👋 We wanted to provide you with an update on your order status.\n\n"
+            "**Current Situation:**\n"
+            "We're currently experiencing either:\n"
+            "• **High Volume of Orders**: We've received an exceptional number of orders recently\n"
+            "• **Limited Designer Availability**: Our specialized designers for your service type are currently at capacity\n\n"
+            "**What This Means:**\n"
+            "• Your order is still in our queue and will be processed\n"
+            "• We're working to assign the best designer for your project\n"
+            "• Quality won't be compromised - we maintain our standards\n\n"
+            "**What You Can Expect:**\n"
+            "• We'll notify you as soon as your order is claimed\n"
+            "• You'll receive regular updates on progress\n"
+            "• We'll communicate any timeline adjustments promptly\n\n"
+            "**We Value Your Business:**\n"
+            "Thank you for choosing .pixel! We understand your time is valuable and appreciate your patience. We're committed to delivering exceptional results that exceed your expectations.\n\n"
+            "If you have any questions or need clarification, please don't hesitate to ask!"
+        ),
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Design Services • We appreciate your patience!")
+    await ctx.send(embed=embed)
+
+@bot.command(name='eta-update')
+async def update_eta(ctx, new_eta: str):
+    """Update the ETA for a design order (privileged only)"""
+    if not has_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if this is a design ticket
+    if not ctx.channel.category or ctx.channel.category.id not in DESIGN_CATEGORY_IDS:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in design ticket channels.", delete_after=5)
+        return
+    
+    # Check if this is a ticket channel
+    if not (ctx.channel.name.startswith('unclaimed-') or ctx.channel.name.startswith('claimed-')):
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in ticket channels.", delete_after=5)
+        return
+    
+    # Check if order details exist
+    if ctx.channel.id not in order_details:
+        await ctx.message.delete()
+        await ctx.send("No order details found for this channel. Please ensure the order was started with /order-start or -os.", delete_after=5)
+        return
+    
+    # Update the ETA
+    old_eta = order_details[ctx.channel.id]['completion_time']
+    order_details[ctx.channel.id]['completion_time'] = new_eta
+    
+    # Create ETA update embed
+    embed = discord.Embed(
+        title="📅 ETA Updated",
+        description=(
+            f"**The estimated completion time for your order has been updated.**\n\n"
+            f"**Previous ETA:** {old_eta}\n"
+            f"**New ETA:** {new_eta}\n"
+            f"**Updated by:** {ctx.author.mention} ({ctx.author.name})\n\n"
+            f"We'll work to meet this updated timeline and keep you informed of any further changes."
+        ),
+        color=0xFFA500,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Design Services • Order Management")
+    
+    await ctx.channel.send(embed=embed)
+    
+    # Log the ETA update
+    await log_eta_update(ctx.channel, ctx.author, old_eta, new_eta)
+    
+    await ctx.message.delete()
+    await ctx.send("✅ ETA updated successfully!", delete_after=3)
+
+@bot.command(name='promote')
+async def promote_user(ctx, user: discord.Member, *, reason: str):
+    """Promote a user to the next role tier (management only)"""
+    # Check if user has management role
+    if not has_manager_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to promote users.", delete_after=5)
+        return
+    
+    # Check if target is a bot
+    if user.bot:
+        await ctx.message.delete()
+        await ctx.send("You cannot promote bots.", delete_after=5)
+        return
+    
+    # Check if target is the same as promoter
+    if user == ctx.author:
+        await ctx.message.delete()
+        await ctx.send("You cannot promote yourself.", delete_after=5)
+        return
+    
+    # Get current role information
+    target_dept, target_tier, current_role_id = get_user_role_tier(user)
+    
+    if not target_dept or target_dept == "EXECUTIVE":
+        await ctx.message.delete()
+        await ctx.send("This user cannot be promoted further or has no valid role tier.", delete_after=5)
+        return
+    
+    # Check if promoter can promote this user
+    if not can_promote_user(ctx.author, user):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to promote this user.", delete_after=5)
+        return
+    
+    # Get next role
+    next_role_id = get_next_role(target_dept, target_tier)
+    if not next_role_id:
+        await ctx.message.delete()
+        await ctx.send("This user is already at the highest tier in their department.", delete_after=5)
+        return
+    
+    try:
+        # Remove current role and add new role
+        current_role = ctx.guild.get_role(current_role_id)
+        next_role = ctx.guild.get_role(next_role_id)
+        
+        if current_role and current_role in user.roles:
+            await user.remove_roles(current_role)
+        
+        if next_role:
+            await user.add_roles(next_role)
+        
+        # Check if this is a trial completion
+        is_trial_completion = target_tier == "trial"
+        
+        # Create promotion embed
+        embed = discord.Embed(
+            title="📈 Promotion Successful!",
+            description=(
+                f"**{user.mention} has been promoted!** 🎉\n\n"
+                f"**Previous Role:** {current_role.mention if current_role else 'None'}\n"
+                f"**New Role:** {next_role.mention if next_role else 'None'}\n"
+                f"**Promoted by:** {ctx.author.mention} ({ctx.author.name})\n"
+                f"**Reason:** {reason}\n\n"
+                f"{'🎉 **Trial Period Completed!** Welcome to the team!' if is_trial_completion else 'Congratulations on your promotion!'}"
+            ),
+            color=0x6B8E6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Management • Promotion System")
+        
+        await ctx.send(embed=embed)
+        
+        # Log the promotion
+        await log_promotion_action("promotion", ctx.author, user, reason, current_role_id, next_role_id)
+        
+        # Log trial completion if applicable
+        if is_trial_completion:
+            await log_trial_completion(user, next_role_id)
+        
+        await ctx.message.delete()
+        
+    except Exception as e:
+        await ctx.message.delete()
+        await ctx.send(f"Error promoting user: {str(e)}", delete_after=5)
+
+@bot.command(name='demote')
+async def demote_user(ctx, user: discord.Member, *, reason: str):
+    """Demote a user to the previous role tier (management only)"""
+    # Check if user has management role
+    if not has_manager_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to demote users.", delete_after=5)
+        return
+    
+    # Check if target is a bot
+    if user.bot:
+        await ctx.message.delete()
+        await ctx.send("You cannot demote bots.", delete_after=5)
+        return
+    
+    # Check if target is the same as demoter
+    if user == ctx.author:
+        await ctx.message.delete()
+        await ctx.send("You cannot demote yourself.", delete_after=5)
+        return
+    
+    # Get current role information
+    target_dept, target_tier, current_role_id = get_user_role_tier(user)
+    
+    if not target_dept or target_dept == "EXECUTIVE":
+        await ctx.message.delete()
+        await ctx.send("This user cannot be demoted or has no valid role tier.", delete_after=5)
+        return
+    
+    # Check if demoter can demote this user
+    if not can_demote_user(ctx.author, user):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to demote this user.", delete_after=5)
+        return
+    
+    # Get previous role
+    prev_role_id = get_previous_role(target_dept, target_tier)
+    if not prev_role_id:
+        await ctx.message.delete()
+        await ctx.send("This user is already at the lowest tier in their department.", delete_after=5)
+        return
+    
+    try:
+        # Remove current role and add new role
+        current_role = ctx.guild.get_role(current_role_id)
+        prev_role = ctx.guild.get_role(prev_role_id)
+        
+        if current_role and current_role in user.roles:
+            await user.remove_roles(current_role)
+        
+        if prev_role:
+            await user.add_roles(prev_role)
+        
+        # Create demotion embed
+        embed = discord.Embed(
+            title="📉 Demotion Action",
+            description=(
+                f"**{user.mention} has been demoted.**\n\n"
+                f"**Previous Role:** {current_role.mention if current_role else 'None'}\n"
+                f"**New Role:** {prev_role.mention if prev_role else 'None'}\n"
+                f"**Demoted by:** {ctx.author.mention} ({ctx.author.name})\n"
+                f"**Reason:** {reason}\n\n"
+                f"This action has been logged for record keeping."
+            ),
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Management • Demotion System")
+        
+        await ctx.send(embed=embed)
+        
+        # Log the demotion
+        await log_promotion_action("demotion", ctx.author, user, reason, current_role_id, prev_role_id)
+        
+        await ctx.message.delete()
+        
+    except Exception as e:
+        await ctx.message.delete()
+        await ctx.send(f"Error demoting user: {str(e)}", delete_after=5)
+
+@bot.command(name='role-info')
+async def role_info(ctx, user: discord.Member):
+    """Get information about a user's role tier (management only)"""
+    # Check if user has management role
+    if not has_manager_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to view role information.", delete_after=5)
+        return
+    
+    dept, tier, role_id = get_user_role_tier(user)
+    
+    if not dept:
+        await ctx.message.delete()
+        await ctx.send("This user has no valid role tier.", delete_after=5)
+        return
+    
+    embed = discord.Embed(
+        title="👤 Role Information",
+        description=f"Role information for {user.mention}",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+    embed.add_field(name="Department", value=dept.title(), inline=True)
+    embed.add_field(name="Current Tier", value=tier.replace('_', ' ').title(), inline=True)
+    
+    if dept in ROLE_HIERARCHY:
+        tiers = list(ROLE_HIERARCHY[dept].keys())
+        try:
+            current_index = tiers.index(tier)
+            if current_index < len(tiers) - 1:
+                next_tier = tiers[current_index + 1]
+                embed.add_field(name="Next Tier", value=next_tier.replace('_', ' ').title(), inline=True)
+            else:
+                embed.add_field(name="Next Tier", value="Maximum tier reached", inline=True)
+            
+            if current_index > 0:
+                prev_tier = tiers[current_index - 1]
+                embed.add_field(name="Previous Tier", value=prev_tier.replace('_', ' ').title(), inline=True)
+            else:
+                embed.add_field(name="Previous Tier", value="Minimum tier", inline=True)
+        except ValueError:
+            embed.add_field(name="Tier Position", value="Unknown", inline=True)
+    
+    embed.set_footer(text=".pixel Management • Role System")
+    
+    await ctx.send(embed=embed)
+    await ctx.message.delete()
+
+@bot.command(name='role-hierarchy')
+async def show_role_hierarchy(ctx):
+    """Show the complete role hierarchy (management only)"""
+    # Check if user has management role
+    if not has_manager_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to view role hierarchy.", delete_after=5)
+        return
+    
+    embed = discord.Embed(
+        title="🏗️ Role Hierarchy",
+        description="Complete role hierarchy for all departments",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    for department, roles in ROLE_HIERARCHY.items():
+        hierarchy_text = ""
+        for i, (tier, role_id) in enumerate(roles.items()):
+            role_mention = f"<@&{role_id}>"
+            if i == 0:
+                hierarchy_text += f"🥇 **{tier.replace('_', ' ').title()}** - {role_mention}\n"
+            elif i == len(roles) - 1:
+                hierarchy_text += f"👑 **{tier.replace('_', ' ').title()}** - {role_mention}\n"
+            else:
+                hierarchy_text += f"📊 **{tier.replace('_', ' ').title()}** - {role_mention}\n"
+        
+        embed.add_field(
+            name=f"📋 {department.title()}",
+            value=hierarchy_text,
+            inline=False
+        )
+    
+    # Add co-executive information
+    embed.add_field(
+        name="👑 Executive",
+        value=f"**Co-Executive** - <@&{CO_EXECUTIVE_ROLE_ID}>\n*Can promote/demote anyone*",
+        inline=False
+    )
+    
+    embed.set_footer(text=".pixel Management • Role Hierarchy")
+    
+    await ctx.send(embed=embed)
+    await ctx.message.delete()
+
+@bot.command(name='department-stats')
+async def department_stats(ctx):
+    """Show statistics for each department (management only)"""
+    # Check if user has management role
+    if not has_manager_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to view department statistics.", delete_after=5)
+        return
+    
+    embed = discord.Embed(
+        title="📊 Department Statistics",
+        description="Current member counts by department and tier",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    for department, roles in ROLE_HIERARCHY.items():
+        dept_stats = ""
+        total_members = 0
+        
+        for tier, role_id in roles.items():
+            role = ctx.guild.get_role(role_id)
+            if role:
+                member_count = len(role.members)
+                total_members += member_count
+                dept_stats += f"• **{tier.replace('_', ' ').title()}**: {member_count} members\n"
+        
+        embed.add_field(
+            name=f"📋 {department.title()} ({total_members} total)",
+            value=dept_stats,
+            inline=True
+        )
+    
+    # Add co-executive count
+    co_exec_role = ctx.guild.get_role(CO_EXECUTIVE_ROLE_ID)
+    if co_exec_role:
+        co_exec_count = len(co_exec_role.members)
+        embed.add_field(
+            name="👑 Executive",
+            value=f"• **Co-Executive**: {co_exec_count} members",
+            inline=True
+        )
+    
+    embed.set_footer(text=".pixel Management • Department Statistics")
+    
+    await ctx.send(embed=embed)
+    await ctx.message.delete()
+
+async def log_eta_update(channel, updater, old_eta, new_eta):
+    """Log ETA update to the logging channel"""
+    try:
+        logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+        if logging_channel:
+            embed = discord.Embed(
+                title="📅 ETA Updated",
+                description=f"An order ETA has been updated",
+                color=0xFFA500,
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Updated By", value=f"{updater.mention} ({updater.name})", inline=True)
+            embed.add_field(name="Channel", value=channel.mention, inline=True)
+            embed.add_field(name="Previous ETA", value=old_eta, inline=True)
+            embed.add_field(name="New ETA", value=new_eta, inline=True)
+            embed.set_footer(text=f"Ticket ID: {channel.id}")
+            
+            await logging_channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error logging ETA update: {e}")
+
+@bot.tree.command(name="delay-explanation", description="Send a professional delay explanation (role restricted)")
+async def slash_delay_explanation(interaction: discord.Interaction):
+    """Slash command version of -de"""
+    # Check if user has the required role
+    if not has_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if this is a design ticket
+    if not interaction.channel.category or interaction.channel.category.id not in DESIGN_CATEGORY_IDS:
+        await interaction.response.send_message("This command can only be used in design ticket channels.", ephemeral=True)
+        return
+    
+    # Check if this is a ticket channel
+    if not (interaction.channel.name.startswith('unclaimed-') or interaction.channel.name.startswith('claimed-')):
+        await interaction.response.send_message("This command can only be used in ticket channels.", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="⏳ Order Update: We Appreciate Your Patience!",
+        description=(
+            "Hello! 👋 We wanted to provide you with an update on your order status.\n\n"
+            "**Current Situation:**\n"
+            "We're currently experiencing either:\n"
+            "• **High Volume of Orders**: We've received an exceptional number of orders recently\n"
+            "• **Limited Designer Availability**: Our specialized designers for your service type are currently at capacity\n\n"
+            "**What This Means:**\n"
+            "• Your order is still in our queue and will be processed\n"
+            "• We're working to assign the best designer for your project\n"
+            "• Quality won't be compromised - we maintain our standards\n\n"
+            "**What You Can Expect:**\n"
+            "• We'll notify you as soon as your order is claimed\n"
+            "• You'll receive regular updates on progress\n"
+            "• We'll communicate any timeline adjustments promptly\n\n"
+            "**We Value Your Business:**\n"
+            "Thank you for choosing .pixel! We understand your time is valuable and appreciate your patience. We're committed to delivering exceptional results that exceed your expectations.\n\n"
+            "If you have any questions or need clarification, please don't hesitate to ask!"
+        ),
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Design Services • We appreciate your patience!")
+    
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="eta-update", description="Update the ETA for a design order (role restricted)")
+@app_commands.describe(new_eta="The new estimated completion time")
+async def slash_eta_update(interaction: discord.Interaction, new_eta: str):
+    """Slash command version of -eta-update"""
+    # Check if user has the required role
+    if not has_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if this is a design ticket
+    if not interaction.channel.category or interaction.channel.category.id not in DESIGN_CATEGORY_IDS:
+        await interaction.response.send_message("This command can only be used in design ticket channels.", ephemeral=True)
+        return
+    
+    # Check if this is a ticket channel
+    if not (interaction.channel.name.startswith('unclaimed-') or interaction.channel.name.startswith('claimed-')):
+        await interaction.response.send_message("This command can only be used in ticket channels.", ephemeral=True)
+        return
+    
+    # Check if order details exist
+    if interaction.channel.id not in order_details:
+        await interaction.response.send_message("No order details found for this channel. Please ensure the order was started with /order-start or -os.", ephemeral=True)
+        return
+    
+    # Update the ETA
+    old_eta = order_details[interaction.channel.id]['completion_time']
+    order_details[interaction.channel.id]['completion_time'] = new_eta
+    
+    # Create ETA update embed
+    embed = discord.Embed(
+        title="📅 ETA Updated",
+        description=(
+            f"**The estimated completion time for your order has been updated.**\n\n"
+            f"**Previous ETA:** {old_eta}\n"
+            f"**New ETA:** {new_eta}\n"
+            f"**Updated by:** {interaction.user.mention} ({interaction.user.name})\n\n"
+            f"We'll work to meet this updated timeline and keep you informed of any further changes."
+        ),
+        color=0xFFA500,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Design Services • Order Management")
+    
+    await interaction.channel.send(embed=embed)
+    
+    # Log the ETA update
+    await log_eta_update(interaction.channel, interaction.user, old_eta, new_eta)
+    
+    await interaction.response.send_message("✅ ETA updated successfully!", ephemeral=True)
+
+@bot.tree.command(name="promote", description="Promote a user to the next role tier (management only)")
+@app_commands.describe(
+    user="The user to promote",
+    reason="Reason for the promotion"
+)
+async def slash_promote(interaction: discord.Interaction, user: discord.Member, reason: str):
+    """Promote a user to the next role tier"""
+    # Check if user has management role
+    if not has_manager_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to promote users.", ephemeral=True)
+        return
+    
+    # Check if target is a bot
+    if user.bot:
+        await interaction.response.send_message("You cannot promote bots.", ephemeral=True)
+        return
+    
+    # Check if target is the same as promoter
+    if user == interaction.user:
+        await interaction.response.send_message("You cannot promote yourself.", ephemeral=True)
+        return
+    
+    # Get current role information
+    target_dept, target_tier, current_role_id = get_user_role_tier(user)
+    
+    if not target_dept or target_dept == "EXECUTIVE":
+        await interaction.response.send_message("This user cannot be promoted further or has no valid role tier.", ephemeral=True)
+        return
+    
+    # Check if promoter can promote this user
+    if not can_promote_user(interaction.user, user):
+        await interaction.response.send_message("You don't have permission to promote this user.", ephemeral=True)
+        return
+    
+    # Get next role
+    next_role_id = get_next_role(target_dept, target_tier)
+    if not next_role_id:
+        await interaction.response.send_message("This user is already at the highest tier in their department.", ephemeral=True)
+        return
+    
+    try:
+        # Remove current role and add new role
+        current_role = interaction.guild.get_role(current_role_id)
+        next_role = interaction.guild.get_role(next_role_id)
+        
+        if current_role and current_role in user.roles:
+            await user.remove_roles(current_role)
+        
+        if next_role:
+            await user.add_roles(next_role)
+        
+        # Check if this is a trial completion
+        is_trial_completion = target_tier == "trial"
+        
+        # Create promotion embed
+        embed = discord.Embed(
+            title="📈 Promotion Successful!",
+            description=(
+                f"**{user.mention} has been promoted!** 🎉\n\n"
+                f"**Previous Role:** {current_role.mention if current_role else 'None'}\n"
+                f"**New Role:** {next_role.mention if next_role else 'None'}\n"
+                f"**Promoted by:** {interaction.user.mention} ({interaction.user.name})\n"
+                f"**Reason:** {reason}\n\n"
+                f"{'🎉 **Trial Period Completed!** Welcome to the team!' if is_trial_completion else 'Congratulations on your promotion!'}"
+            ),
+            color=0x6B8E6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Management • Promotion System")
+        
+        await interaction.response.send_message(embed=embed)
+        
+        # Log the promotion
+        await log_promotion_action("promotion", interaction.user, user, reason, current_role_id, next_role_id)
+        
+        # Log trial completion if applicable
+        if is_trial_completion:
+            await log_trial_completion(user, next_role_id)
+        
+    except Exception as e:
+        await interaction.response.send_message(f"Error promoting user: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="demote", description="Demote a user to the previous role tier (management only)")
+@app_commands.describe(
+    user="The user to demote",
+    reason="Reason for the demotion"
+)
+async def slash_demote(interaction: discord.Interaction, user: discord.Member, reason: str):
+    """Demote a user to the previous role tier"""
+    # Check if user has management role
+    if not has_manager_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to demote users.", ephemeral=True)
+        return
+    
+    # Check if target is a bot
+    if user.bot:
+        await interaction.response.send_message("You cannot demote bots.", ephemeral=True)
+        return
+    
+    # Check if target is the same as demoter
+    if user == interaction.user:
+        await interaction.response.send_message("You cannot demote yourself.", ephemeral=True)
+        return
+    
+    # Get current role information
+    target_dept, target_tier, current_role_id = get_user_role_tier(user)
+    
+    if not target_dept or target_dept == "EXECUTIVE":
+        await interaction.response.send_message("This user cannot be demoted or has no valid role tier.", ephemeral=True)
+        return
+    
+    # Check if demoter can demote this user
+    if not can_demote_user(interaction.user, user):
+        await interaction.response.send_message("You don't have permission to demote this user.", ephemeral=True)
+        return
+    
+    # Get previous role
+    prev_role_id = get_previous_role(target_dept, target_tier)
+    if not prev_role_id:
+        await interaction.response.send_message("This user is already at the lowest tier in their department.", ephemeral=True)
+        return
+    
+    try:
+        # Remove current role and add new role
+        current_role = interaction.guild.get_role(current_role_id)
+        prev_role = interaction.guild.get_role(prev_role_id)
+        
+        if current_role and current_role in user.roles:
+            await user.remove_roles(current_role)
+        
+        if prev_role:
+            await user.add_roles(prev_role)
+        
+        # Create demotion embed
+        embed = discord.Embed(
+            title="📉 Demotion Action",
+            description=(
+                f"**{user.mention} has been demoted.**\n\n"
+                f"**Previous Role:** {current_role.mention if current_role else 'None'}\n"
+                f"**New Role:** {prev_role.mention if prev_role else 'None'}\n"
+                f"**Demoted by:** {interaction.user.mention} ({interaction.user.name})\n"
+                f"**Reason:** {reason}\n\n"
+                f"This action has been logged for record keeping."
+            ),
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Management • Demotion System")
+        
+        await interaction.response.send_message(embed=embed)
+        
+        # Log the demotion
+        await log_promotion_action("demotion", interaction.user, user, reason, current_role_id, prev_role_id)
+        
+    except Exception as e:
+        await interaction.response.send_message(f"Error demoting user: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name="role-info", description="Get information about a user's role tier")
+@app_commands.describe(user="The user to check")
+async def slash_role_info(interaction: discord.Interaction, user: discord.Member):
+    """Get information about a user's role tier"""
+    # Check if user has management role
+    if not has_manager_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to view role information.", ephemeral=True)
+        return
+    
+    dept, tier, role_id = get_user_role_tier(user)
+    
+    if not dept:
+        await interaction.response.send_message("This user has no valid role tier.", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="👤 Role Information",
+        description=f"Role information for {user.mention}",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+    embed.add_field(name="Department", value=dept.title(), inline=True)
+    embed.add_field(name="Current Tier", value=tier.replace('_', ' ').title(), inline=True)
+    
+    if dept in ROLE_HIERARCHY:
+        tiers = list(ROLE_HIERARCHY[dept].keys())
+        try:
+            current_index = tiers.index(tier)
+            if current_index < len(tiers) - 1:
+                next_tier = tiers[current_index + 1]
+                embed.add_field(name="Next Tier", value=next_tier.replace('_', ' ').title(), inline=True)
+            else:
+                embed.add_field(name="Next Tier", value="Maximum tier reached", inline=True)
+            
+            if current_index > 0:
+                prev_tier = tiers[current_index - 1]
+                embed.add_field(name="Previous Tier", value=prev_tier.replace('_', ' ').title(), inline=True)
+            else:
+                embed.add_field(name="Previous Tier", value="Minimum tier", inline=True)
+        except ValueError:
+            embed.add_field(name="Tier Position", value="Unknown", inline=True)
+    
+    embed.set_footer(text=".pixel Management • Role System")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="role-hierarchy", description="Show the complete role hierarchy (management only)")
+async def slash_role_hierarchy(interaction: discord.Interaction):
+    """Show the complete role hierarchy"""
+    # Check if user has management role
+    if not has_manager_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to view role hierarchy.", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🏗️ Role Hierarchy",
+        description="Complete role hierarchy for all departments",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    for department, roles in ROLE_HIERARCHY.items():
+        hierarchy_text = ""
+        for i, (tier, role_id) in enumerate(roles.items()):
+            role_mention = f"<@&{role_id}>"
+            if i == 0:
+                hierarchy_text += f"🥇 **{tier.replace('_', ' ').title()}** - {role_mention}\n"
+            elif i == len(roles) - 1:
+                hierarchy_text += f"👑 **{tier.replace('_', ' ').title()}** - {role_mention}\n"
+            else:
+                hierarchy_text += f"📊 **{tier.replace('_', ' ').title()}** - {role_mention}\n"
+        
+        embed.add_field(
+            name=f"📋 {department.title()}",
+            value=hierarchy_text,
+            inline=False
+        )
+    
+    # Add co-executive information
+    embed.add_field(
+        name="👑 Executive",
+        value=f"**Co-Executive** - <@&{CO_EXECUTIVE_ROLE_ID}>\n*Can promote/demote anyone*",
+        inline=False
+    )
+    
+    embed.set_footer(text=".pixel Management • Role Hierarchy")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="department-stats", description="Show statistics for each department (management only)")
+async def slash_department_stats(interaction: discord.Interaction):
+    """Show statistics for each department"""
+    # Check if user has management role
+    if not has_manager_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to view department statistics.", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="📊 Department Statistics",
+        description="Current member counts by department and tier",
+        color=0x1B75BD,
+        timestamp=datetime.utcnow()
+    )
+    
+    for department, roles in ROLE_HIERARCHY.items():
+        dept_stats = ""
+        total_members = 0
+        
+        for tier, role_id in roles.items():
+            role = interaction.guild.get_role(role_id)
+            if role:
+                member_count = len(role.members)
+                total_members += member_count
+                dept_stats += f"• **{tier.replace('_', ' ').title()}**: {member_count} members\n"
+        
+        embed.add_field(
+            name=f"📋 {department.title()} ({total_members} total)",
+            value=dept_stats,
+            inline=True
+        )
+    
+    # Add co-executive count
+    co_exec_role = interaction.guild.get_role(CO_EXECUTIVE_ROLE_ID)
+    if co_exec_role:
+        co_exec_count = len(co_exec_role.members)
+        embed.add_field(
+            name="👑 Executive",
+            value=f"• **Co-Executive**: {co_exec_count} members",
+            inline=True
+        )
+    
+    embed.set_footer(text=".pixel Management • Department Statistics")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# Promotion/Demotion system constants
+PROMOTION_LOG_CHANNEL_ID = 1395548061534650378
+
+# Role hierarchy definitions
+ROLE_HIERARCHY = {
+    "DESIGNERS": {
+        "trial": 1362585427135168652,
+        "junior": 1362585427135168653,
+        "standard": 1362585427168592018,  # Original CLAIM_ROLE_ID
+        "senior": 1362585427168592015,
+        "lead": 1362585427168592016,
+        "head": 1362585427168592017
+    },
+    "SUPPORT": {
+        "trial": 1362585427168592020,
+        "junior": 1362585427168592021,
+        "normal": 1362585427168592022,
+        "senior": 1362585427168592023,
+        "head": 1362585427168592024
+    },
+    "MANAGEMENT": {
+        "trial": 1362585427550146614,
+        "standard": 1362585427550146615,
+        "senior": 1362585427550146616,
+        "head": 1362585427550146617,
+        "manager": 1362585427550146618  # Add the missing manager role
+    }
+}
+
+# Special roles
+CO_EXECUTIVE_ROLE_ID = 1389024033408024647
+MANAGEMENT_REQUIRED_ROLE_ID = 1362585427550146618
+
+def get_user_role_tier(user):
+    """Get the current role tier of a user"""
+    user_role_ids = [role.id for role in user.roles]
+    
+    # Check each department
+    for department, roles in ROLE_HIERARCHY.items():
+        for tier, role_id in roles.items():
+            if role_id in user_role_ids:
+                return department, tier, role_id
+    
+    # Check for co-executive
+    if CO_EXECUTIVE_ROLE_ID in user_role_ids:
+        return "EXECUTIVE", "co_executive", CO_EXECUTIVE_ROLE_ID
+    
+    return None, None, None
+
+def get_next_role(department, current_tier):
+    """Get the next role in the hierarchy"""
+    if department not in ROLE_HIERARCHY:
+        return None
+    
+    tiers = list(ROLE_HIERARCHY[department].keys())
+    try:
+        current_index = tiers.index(current_tier)
+        if current_index < len(tiers) - 1:
+            next_tier = tiers[current_index + 1]
+            return ROLE_HIERARCHY[department][next_tier]
+    except ValueError:
+        pass
+    
+    return None
+
+def get_previous_role(department, current_tier):
+    """Get the previous role in the hierarchy"""
+    if department not in ROLE_HIERARCHY:
+        return None
+    
+    tiers = list(ROLE_HIERARCHY[department].keys())
+    try:
+        current_index = tiers.index(current_tier)
+        if current_index > 0:
+            prev_tier = tiers[current_index - 1]
+            return ROLE_HIERARCHY[department][prev_tier]
+    except ValueError:
+        pass
+    
+    return None
+
+def get_promoter_max_role(promoter):
+    """Get the highest role tier the promoter can promote to"""
+    promoter_dept, promoter_tier, _ = get_user_role_tier(promoter)
+    
+    if promoter_dept == "EXECUTIVE":
+        return None  # Can promote to any role
+    
+    if promoter_dept not in ROLE_HIERARCHY:
+        return None
+    
+    # Find the role that's one below the promoter's role
+    tiers = list(ROLE_HIERARCHY[promoter_dept].keys())
+    try:
+        promoter_index = tiers.index(promoter_tier)
+        if promoter_index > 0:
+            max_tier = tiers[promoter_index - 1]
+            return ROLE_HIERARCHY[promoter_dept][max_tier]
+    except ValueError:
+        pass
+    
+    return None
+
+def can_promote_user(promoter, target_user):
+    """Check if promoter can promote target user"""
+    promoter_dept, promoter_tier, _ = get_user_role_tier(promoter)
+    target_dept, target_tier, _ = get_user_role_tier(target_user)
+    
+    # Co-executives can promote anyone
+    if promoter_dept == "EXECUTIVE":
+        return True
+    
+    # Can only promote within same department
+    if promoter_dept != target_dept:
+        return False
+    
+    # Check if target is already at or above promoter's level
+    if promoter_dept in ROLE_HIERARCHY:
+        tiers = list(ROLE_HIERARCHY[promoter_dept].keys())
+        try:
+            promoter_index = tiers.index(promoter_tier)
+            target_index = tiers.index(target_tier)
+            return target_index < promoter_index
+        except ValueError:
+            return False
+    
+    return False
+
+def can_demote_user(demoter, target_user):
+    """Check if demoter can demote target user"""
+    demoter_dept, demoter_tier, _ = get_user_role_tier(demoter)
+    target_dept, target_tier, _ = get_user_role_tier(target_user)
+    
+    # Co-executives can demote anyone
+    if demoter_dept == "EXECUTIVE":
+        return True
+    
+    # Can only demote within same department
+    if demoter_dept != target_dept:
+        return False
+    
+    # Check if target is at or above demoter's level
+    if demoter_dept in ROLE_HIERARCHY:
+        tiers = list(ROLE_HIERARCHY[demoter_dept].keys())
+        try:
+            demoter_index = tiers.index(demoter_tier)
+            target_index = tiers.index(target_tier)
+            return target_index >= demoter_index
+        except ValueError:
+            return False
+    
+    return False
+
+async def log_promotion_action(action_type, actor, target, reason, old_role, new_role):
+    """Log promotion/demotion actions"""
+    try:
+        logging_channel = actor.guild.get_channel(PROMOTION_LOG_CHANNEL_ID)
+        if not logging_channel:
+            return
+        
+        color = 0x6B8E6B if action_type == "promotion" else 0x8E6B6B
+        
+        embed = discord.Embed(
+            title=f"{'📈' if action_type == 'promotion' else '📉'} {action_type.title()} Action",
+            description=f"A user has been {action_type}",
+            color=color,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.add_field(name="Actor", value=f"{actor.mention} ({actor.name})", inline=True)
+        embed.add_field(name="Target", value=f"{target.mention} ({target.name})", inline=True)
+        embed.add_field(name="Action", value=action_type.title(), inline=True)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        
+        if old_role:
+            embed.add_field(name="Previous Role", value=f"<@&{old_role}>", inline=True)
+        if new_role:
+            embed.add_field(name="New Role", value=f"<@&{new_role}>", inline=True)
+        
+        embed.set_footer(text=f"Action ID: {actor.id}-{target.id}-{datetime.utcnow().timestamp()}")
+        
+        await logging_channel.send(embed=embed)
+        
+    except Exception as e:
+        print(f"Error logging {action_type} action: {e}")
+
+async def log_trial_completion(target, new_role):
+    """Log when a user completes their trial period"""
+    try:
+        logging_channel = target.guild.get_channel(PROMOTION_LOG_CHANNEL_ID)
+        if not logging_channel:
+            return
+        
+        embed = discord.Embed(
+            title="🎉 Trial Period Completed!",
+            description=f"A user has successfully completed their trial period",
+            color=0x00FF00,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.add_field(name="User", value=f"{target.mention} ({target.name})", inline=True)
+        embed.add_field(name="New Role", value=f"<@&{new_role}>", inline=True)
+        embed.add_field(name="Status", value="✅ Trial Completed", inline=True)
+        embed.add_field(name="Message", value="Congratulations on completing your trial period! Welcome to the team!", inline=False)
+        
+        embed.set_footer(text=f"Trial Completion ID: {target.id}-{datetime.utcnow().timestamp()}")
+        
+        await logging_channel.send(embed=embed)
+        
+    except Exception as e:
+        print(f"Error logging trial completion: {e}")
 
 # Run the bot
 if __name__ == "__main__":
