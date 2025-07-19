@@ -40,6 +40,11 @@ SUPPORT_GENERAL_CATEGORY_ID = 1362585430024781936
 SUPPORT_HIGH_RANK_CATEGORY_ID = 1362585430024781937
 EXECUTIVE_CHANNEL_ID = 1362585430024781938
 
+# Package claim system constants
+PACKAGE_CLAIM_CHANNEL_ID = 1396080308381683815
+PACKAGE_CLAIM_CATEGORY_ID = 1396130790114590851
+PACKAGE_CLAIM_ENABLED = True  # Global flag to control package claim availability
+
 # Consolidated role lists
 MANAGER_ROLE_IDS = [
     1362585427621707999,  # Original ORDER_ROLE_ID
@@ -2041,6 +2046,145 @@ async def create_support_embed(ctx):
     # Send the embed with buttons
     await ctx.send(embed=embed, view=SupportTicketOrderView())
 
+@bot.command(name='pe')
+async def create_package_claim_embed(ctx):
+    """Create the package claim embed (only for users with specific role)"""
+    # Check if user has the required role
+    if not has_support_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if command is used in the correct channel
+    if ctx.channel.id != PACKAGE_CLAIM_CHANNEL_ID:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in the designated channel.", delete_after=5)
+        return
+    
+    # Delete the command message
+    await ctx.message.delete()
+    
+    # Create the main package claim embed
+    embed = discord.Embed(
+        title="📦 .pixel Package Claims",
+        description=(
+            "Ready to claim your purchased package? We're here to help! \n\n"
+            "🎁 **Package Claim Process**\n\n"
+            "• **Easy Claim Process**: Simple and straightforward package claiming\n"
+            "• **Professional Support**: Our team will assist you with your claim\n"
+            "• **Quick Processing**: We prioritize your package claims\n"
+            "• **Secure Verification**: We ensure your purchase is verified\n"
+            "• **Friendly Service**: Professional and helpful staff\n\n"
+            "**Ready to claim your package?** \n\nClick the button below to start your package claim process."
+        ),
+        color=0x1B75BD,
+    )
+    
+    embed.add_field(
+        name="📋 What You'll Need",
+        value="• Proof of purchase (screenshot/receipt)\n• Package details\n• Any additional requirements",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="⏱️ Processing Time",
+        value="• Standard processing: 1-2 hours\n• Priority processing available",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💡 Tips for Faster Processing",
+        value="• Ensure proof of purchase is clear and readable\n• Include your username/email if not visible\n• Be specific about which package you purchased",
+        inline=False
+    )
+    
+    embed.set_footer(text="Professional Package Claims • We're here to help!")
+    
+    # Send the embed with buttons
+    await ctx.send(embed=embed, view=PackageClaimView())
+
+@bot.command(name='disable-package-claims')
+async def disable_package_claims(ctx):
+    """Disable package claim functionality (role restricted)"""
+    global PACKAGE_CLAIM_ENABLED
+    
+    # Check if user has the required role
+    if not has_support_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if command is used in the correct channel
+    if ctx.channel.id != PACKAGE_CLAIM_CHANNEL_ID:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in the designated channel.", delete_after=5)
+        return
+    
+    # Delete the command message
+    await ctx.message.delete()
+    
+    # Disable package claims
+    PACKAGE_CLAIM_ENABLED = False
+    
+    # Create confirmation embed
+    embed = discord.Embed(
+        title="📦 Package Claims Disabled",
+        description=(
+            f"Package claim functionality has been **disabled** by {ctx.author.mention}.\n\n"
+            "**What this means:**\n"
+            "• Users can no longer create package claim tickets\n"
+            "• The 'Claim Package' button will show a 'coming soon' message\n"
+            "• Existing tickets remain unaffected\n\n"
+            "**To re-enable:** Use `-enable-package-claims` or `/enable-package-claims`"
+        ),
+        color=0xFF6B6B,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Package Claims • Management")
+    
+    await ctx.send(embed=embed, delete_after=10)
+
+@bot.command(name='enable-package-claims')
+async def enable_package_claims(ctx):
+    """Enable package claim functionality (role restricted)"""
+    global PACKAGE_CLAIM_ENABLED
+    
+    # Check if user has the required role
+    if not has_support_privileged_role(ctx.author):
+        await ctx.message.delete()
+        await ctx.send("You don't have permission to use this command.", delete_after=5)
+        return
+    
+    # Check if command is used in the correct channel
+    if ctx.channel.id != PACKAGE_CLAIM_CHANNEL_ID:
+        await ctx.message.delete()
+        await ctx.send("This command can only be used in the designated channel.", delete_after=5)
+        return
+    
+    # Delete the command message
+    await ctx.message.delete()
+    
+    # Enable package claims
+    PACKAGE_CLAIM_ENABLED = True
+    
+    # Create confirmation embed
+    embed = discord.Embed(
+        title="📦 Package Claims Enabled",
+        description=(
+            f"Package claim functionality has been **enabled** by {ctx.author.mention}.\n\n"
+            "**What this means:**\n"
+            "• Users can now create package claim tickets\n"
+            "• The 'Claim Package' button is fully functional\n"
+            "• Package claims are now live! 🎉\n\n"
+            "**To disable:** Use `-disable-package-claims` or `/disable-package-claims`"
+        ),
+        color=0x6B8E6B,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Package Claims • Management")
+    
+    await ctx.send(embed=embed, delete_after=10)
+
 def has_manager_role(user):
     """Check if user has any manager/executive role"""
     user_role_ids = [role.id for role in user.roles]
@@ -3068,6 +3212,314 @@ class SupportTicketOrderView(discord.ui.View):
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+class PackageClaimView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Claim Package", style=discord.ButtonStyle.primary, custom_id="claim_package")
+    async def claim_package(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if package claims are enabled
+        if not PACKAGE_CLAIM_ENABLED:
+            embed = discord.Embed(
+                title="📦 Package Claims Temporarily Unavailable",
+                description=(
+                    "We're excited to announce that our packages are launching very soon! 🎉\n\n"
+                    "**What's happening?**\n"
+                    "• Our team is putting the final touches on the packages\n"
+                    "• We're ensuring everything is perfect for you\n"
+                    "• The packages will be available in just a few hours\n\n"
+                    "**What can you do?**\n"
+                    "• Stay tuned for the official announcement\n"
+                    "• Prepare your proof of purchase for when we launch\n"
+                    "• Join our community to get notified first\n\n"
+                    "**We appreciate your patience!** 🙏\n"
+                    "The wait will be worth it - our packages are going to be amazing!"
+                ),
+                color=0xFFA500,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Package Claims • Coming Soon!")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        # Check if user already has an open package claim ticket
+        guild = interaction.guild
+        user = interaction.user
+        
+        existing_ticket = discord.utils.get(guild.channels, name=f"package-claim-{user.name.lower()}")
+        if existing_ticket:
+            await interaction.response.send_message(
+                f"You already have an open package claim ticket: {existing_ticket.mention}",
+                ephemeral=True
+            )
+            return
+        
+        # Get package claim category
+        category = guild.get_channel(PACKAGE_CLAIM_CATEGORY_ID)
+        if not category:
+            await interaction.response.send_message("Error: Package claim category not found.", ephemeral=True)
+            return
+        
+        # Create package claim ticket channel
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
+        }
+        
+        # Add support role permissions for staff to help
+        support_role = guild.get_role(SUPPORT_ROLE_ID)
+        if support_role:
+            overwrites[support_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        
+        # Add executive role permissions
+        executive_role = guild.get_role(EXECUTIVE_ROLE_ID)
+        if executive_role:
+            overwrites[executive_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        
+        # Add high rank role permissions
+        high_rank_role = guild.get_role(HIGH_RANK_ROLE_ID)
+        if high_rank_role:
+            overwrites[high_rank_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        
+        ticket_channel = await guild.create_text_channel(
+            f"package-claim-{user.name}",
+            category=category,
+            overwrites=overwrites,
+            topic=f"Package claim ticket for {user.mention}"
+        )
+        
+        await self.send_package_claim_welcome_message(ticket_channel, user)
+        await interaction.response.send_message(
+            f"Your package claim ticket has been created: {ticket_channel.mention}!",
+            ephemeral=True
+        )
+    
+    async def send_package_claim_welcome_message(self, channel, user):
+        try:
+            embed = discord.Embed(
+                title="📦 Welcome to your Package Claim Ticket!",
+                description=(
+                    f"Hello {user.mention}! 👋\n\n"
+                    f"**Welcome to your package claim ticket!**\n\n"
+                    f"**📋 What we need from you:**\n"
+                    f"• **Proof of Purchase**: Screenshot or receipt of your package purchase\n"
+                    f"• **Package Details**: Which package you're claiming\n"
+                    f"• **Any Additional Info**: Any specific requirements or questions\n\n"
+                    f"**💡 Tips for faster processing:**\n"
+                    f"• Make sure your proof of purchase is clear and readable\n"
+                    f"• Include your username/email if it's not visible in the proof\n"
+                    f"• Be specific about which package you purchased\n"
+                    f"• Our staff will help you claim your package as soon as possible\n\n"
+                    f"**Please provide the required information above so we can assist you!** 🚀\n\n"
+                    f"Thank you for your purchase! 🙏"
+                ),
+                color=0x1B75BD,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=f".pixel Package Claims • Ticket ID: {channel.id}")
+            
+            # Create package claim management view
+            package_claim_view = PackageClaimManagementView()
+            
+            # Send pings first
+            ping_message = f"Hey {user.mention}, our staff will be with you shortly to help with your package claim!"
+            
+            await channel.send(ping_message)
+            
+            # Send embed with management buttons
+            await channel.send(embed=embed, view=package_claim_view)
+            
+            # Log package claim ticket creation
+            await self.log_package_claim_creation(channel, user)
+        except Exception as e:
+            print(f"Error sending package claim welcome message: {e}")
+            try:
+                await channel.send(f"Welcome {user.mention}! Please provide proof of purchase and package details.")
+            except:
+                pass
+    
+    async def log_package_claim_creation(self, channel, user):
+        """Log package claim ticket creation to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="📦 New Package Claim Ticket Created",
+                    description=f"A new package claim ticket has been created",
+                    color=0x6B8E6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="User", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Type", value="Package Claim", inline=True)
+                embed.add_field(name="Channel", value=channel.mention, inline=True)
+                embed.add_field(name="Status", value="🟡 Unclaimed", inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging package claim creation: {e}")
+
+class PackageClaimManagementView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Claim Ticket", style=discord.ButtonStyle.success, custom_id="claim_package_ticket")
+    async def claim_package_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has support role
+        if not has_support_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to claim package claim tickets.", ephemeral=True)
+            return
+        
+        channel = interaction.channel
+        
+        # Check if ticket is already claimed
+        if channel.name.startswith("claimed-"):
+            await interaction.response.send_message("This ticket has already been claimed.", ephemeral=True)
+            return
+        
+        # Rename channel
+        try:
+            await channel.edit(name=f"claimed-{interaction.user.name}")
+            
+            # Send claim message
+            embed = discord.Embed(
+                title="Package Claim Ticket Claimed Successfully!",
+                description=f"{interaction.user.mention} has claimed this package claim ticket!",
+                color=0x6B8E6B,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Package Claims")
+            
+            await channel.send(embed=embed)
+            
+            # Log claim
+            await self.log_package_claim_ticket_claim(channel, interaction.user)
+            
+            # Disable claim button
+            button.disabled = True
+            button.label = "Claimed"
+            await interaction.response.edit_message(view=self)
+            
+        except Exception as e:
+            await interaction.response.send_message(f"Error claiming ticket: {e}", ephemeral=True)
+    
+    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="close_package_claim_ticket")
+    async def close_package_claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has close privilege (support, high rank, or executive roles)
+        if not has_support_privileged_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to close package claim tickets.", ephemeral=True)
+            return
+        
+        # Create confirmation view
+        confirm_view = PackageClaimCloseConfirmationView()
+        embed = discord.Embed(
+            title="⚠️ Confirm Ticket Closure",
+            description=(
+                f"Are you sure you want to close this package claim ticket?\n\n"
+                f"This action cannot be undone and the channel will be archived.\n\n"
+                f"**Closed by:** {interaction.user.mention}"
+            ),
+            color=0xFF6B6B,
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=".pixel Package Claims • Confirmation Required")
+        
+        await interaction.response.send_message(embed=embed, view=confirm_view, ephemeral=True)
+    
+    async def log_package_claim_ticket_claim(self, channel, user):
+        """Log package claim ticket claim to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="📦 Package Claim Ticket Claimed",
+                    description=f"A package claim ticket has been claimed",
+                    color=0x6B8E6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Claimed by", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Channel", value=channel.mention, inline=True)
+                embed.add_field(name="Status", value="🟢 Claimed", inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging package claim ticket claim: {e}")
+
+class PackageClaimCloseConfirmationView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label="Confirm Close", style=discord.ButtonStyle.danger, custom_id="confirm_close_package_claim")
+    async def confirm_close_package_claim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user has close privilege (support, high rank, or executive roles)
+        if not has_support_privileged_role(interaction.user):
+            await interaction.response.send_message("You don't have permission to close package claim tickets.", ephemeral=True)
+            return
+        
+        channel = interaction.channel
+        
+        try:
+            # Find the ticket opener
+            ticket_opener_name = await find_ticket_opener(channel)
+            
+            # Send closure DM
+            await send_ticket_closure_dm(channel, interaction.user, "package claim ticket")
+            
+            # Log ticket closure
+            await self.log_package_claim_ticket_close(channel, interaction.user)
+            
+            # Send closure message
+            embed = discord.Embed(
+                title="📦 Package Claim Ticket Closed",
+                description=(
+                    f"This package claim ticket has been closed by {interaction.user.mention}.\n\n"
+                    f"**Ticket opener:** {ticket_opener_name}\n"
+                    f"**Closed by:** {interaction.user.mention}\n"
+                    f"**Closed at:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
+                    f"The channel will be archived shortly."
+                ),
+                color=0xFF6B6B,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Package Claims • Ticket Closed")
+            
+            await channel.send(embed=embed)
+            
+            # Archive the channel after a delay
+            await asyncio.sleep(5)
+            await channel.edit(archived=True)
+            
+            await interaction.response.send_message("Package claim ticket closed successfully.", ephemeral=True)
+            
+        except Exception as e:
+            await interaction.response.send_message(f"Error closing ticket: {e}", ephemeral=True)
+    
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="cancel_close_package_claim")
+    async def cancel_close_package_claim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Ticket closure cancelled.", ephemeral=True)
+    
+    async def log_package_claim_ticket_close(self, channel, user):
+        """Log package claim ticket closure to the logging channel"""
+        try:
+            logging_channel = channel.guild.get_channel(LOGGING_CHANNEL_ID)
+            if logging_channel:
+                embed = discord.Embed(
+                    title="📦 Package Claim Ticket Closed",
+                    description=f"A package claim ticket has been closed",
+                    color=0xFF6B6B,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Closed by", value=f"{user.mention} ({user.name})", inline=True)
+                embed.add_field(name="Channel", value=channel.mention, inline=True)
+                embed.add_field(name="Status", value="🔴 Closed", inline=True)
+                embed.set_footer(text=f"Ticket ID: {channel.id}")
+                
+                await logging_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Error logging package claim ticket close: {e}")
+
 def has_privileged_role(user):
     """Check if user has any manager or designer role"""
     return has_manager_role(user) or has_designer_role(user)
@@ -3148,6 +3600,130 @@ async def slash_create_support_embed(interaction: discord.Interaction):
     
     # Send the embed with buttons
     await interaction.response.send_message(embed=embed, view=SupportTicketOrderView())
+
+@bot.tree.command(name="create-package-claim-embed", description="Create the package claim embed (role restricted)")
+async def slash_create_package_claim_embed(interaction: discord.Interaction):
+    """Slash command version of -pe"""
+    # Check if user has the required role
+    if not has_support_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if command is used in the correct channel
+    if interaction.channel.id != PACKAGE_CLAIM_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated channel.", ephemeral=True)
+        return
+    
+    # Create the main package claim embed
+    embed = discord.Embed(
+        title="📦 .pixel Package Claims",
+        description=(
+            "Ready to claim your purchased package? We're here to help! \n\n"
+            "🎁 **Package Claim Process**\n\n"
+            "• **Easy Claim Process**: Simple and straightforward package claiming\n"
+            "• **Professional Support**: Our team will assist you with your claim\n"
+            "• **Quick Processing**: We prioritize your package claims\n"
+            "• **Secure Verification**: We ensure your purchase is verified\n"
+            "• **Friendly Service**: Professional and helpful staff\n\n"
+            "**Ready to claim your package?** \n\nClick the button below to start your package claim process."
+        ),
+        color=0x1B75BD,
+    )
+    
+    embed.add_field(
+        name="📋 What You'll Need",
+        value="• Proof of purchase (screenshot/receipt)\n• Package details\n• Any additional requirements",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="⏱️ Processing Time",
+        value="• Standard processing: 1-2 hours\n• Priority processing available",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="💡 Tips for Faster Processing",
+        value="• Ensure proof of purchase is clear and readable\n• Include your username/email if not visible\n• Be specific about which package you purchased",
+        inline=False
+    )
+    
+    embed.set_footer(text="Professional Package Claims • We're here to help!")
+    
+    # Send the embed with buttons
+    await interaction.response.send_message(embed=embed, view=PackageClaimView())
+
+@bot.tree.command(name="disable-package-claims", description="Disable package claim functionality (role restricted)")
+async def slash_disable_package_claims(interaction: discord.Interaction):
+    """Slash command version of -disable-package-claims"""
+    global PACKAGE_CLAIM_ENABLED
+    
+    # Check if user has the required role
+    if not has_support_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if command is used in the correct channel
+    if interaction.channel.id != PACKAGE_CLAIM_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated channel.", ephemeral=True)
+        return
+    
+    # Disable package claims
+    PACKAGE_CLAIM_ENABLED = False
+    
+    # Create confirmation embed
+    embed = discord.Embed(
+        title="📦 Package Claims Disabled",
+        description=(
+            f"Package claim functionality has been **disabled** by {interaction.user.mention}.\n\n"
+            "**What this means:**\n"
+            "• Users can no longer create package claim tickets\n"
+            "• The 'Claim Package' button will show a 'coming soon' message\n"
+            "• Existing tickets remain unaffected\n\n"
+            "**To re-enable:** Use `-enable-package-claims` or `/enable-package-claims`"
+        ),
+        color=0xFF6B6B,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Package Claims • Management")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="enable-package-claims", description="Enable package claim functionality (role restricted)")
+async def slash_enable_package_claims(interaction: discord.Interaction):
+    """Slash command version of -enable-package-claims"""
+    global PACKAGE_CLAIM_ENABLED
+    
+    # Check if user has the required role
+    if not has_support_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Check if command is used in the correct channel
+    if interaction.channel.id != PACKAGE_CLAIM_CHANNEL_ID:
+        await interaction.response.send_message("This command can only be used in the designated channel.", ephemeral=True)
+        return
+    
+    # Enable package claims
+    PACKAGE_CLAIM_ENABLED = True
+    
+    # Create confirmation embed
+    embed = discord.Embed(
+        title="📦 Package Claims Enabled",
+        description=(
+            f"Package claim functionality has been **enabled** by {interaction.user.mention}.\n\n"
+            "**What this means:**\n"
+            "• Users can now create package claim tickets\n"
+            "• The 'Claim Package' button is fully functional\n"
+            "• Package claims are now live! 🎉\n\n"
+            "**To disable:** Use `-disable-package-claims` or `/disable-package-claims`"
+        ),
+        color=0x6B8E6B,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text=".pixel Package Claims • Management")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name="switch-claim", description="Switch the claim of a ticket to another person (support/design tickets)")
 @app_commands.describe(new_claimer="The new person to claim the ticket")
