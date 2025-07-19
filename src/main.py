@@ -2065,43 +2065,77 @@ async def create_package_claim_embed(ctx):
     await ctx.message.delete()
     
     # Create the main package claim embed
-    embed = discord.Embed(
-        title="📦 .pixel Package Claims",
-        description=(
-            "Ready to claim your purchased package? We're here to help! \n\n"
-            "🎁 **Package Claim Process**\n\n"
-            "• **Easy Claim Process**: Simple and straightforward package claiming\n"
-            "• **Professional Support**: Our team will assist you with your claim\n"
-            "• **Quick Processing**: We prioritize your package claims\n"
-            "• **Secure Verification**: We ensure your purchase is verified\n"
-            "• **Friendly Service**: Professional and helpful staff\n\n"
-            "**Ready to claim your package?** \n\nClick the button below to start your package claim process."
-        ),
-        color=0x1B75BD,
-    )
-    
-    embed.add_field(
-        name="📋 What You'll Need",
-        value="• Proof of purchase (screenshot/receipt)\n• Package details\n• Any additional requirements",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="⏱️ Processing Time",
-        value="• Standard processing: 1-2 hours\n• Priority processing available",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="💡 Tips for Faster Processing",
-        value="• Ensure proof of purchase is clear and readable\n• Include your username/email if not visible\n• Be specific about which package you purchased",
-        inline=False
-    )
-    
-    embed.set_footer(text="Professional Package Claims • We're here to help!")
+    if PACKAGE_CLAIM_ENABLED:
+        embed = discord.Embed(
+            title="📦 .pixel Package Claims",
+            description=(
+                "Ready to claim your purchased package? We're here to help! \n\n"
+                "🎁 **Package Claim Process**\n\n"
+                "• **Easy Claim Process**: Simple and straightforward package claiming\n"
+                "• **Professional Support**: Our team will assist you with your claim\n"
+                "• **Quick Processing**: We prioritize your package claims\n"
+                "• **Secure Verification**: We ensure your purchase is verified\n"
+                "• **Friendly Service**: Professional and helpful staff\n\n"
+                "**Ready to claim your package?** \n\nClick the button below to start your package claim process."
+            ),
+            color=0x1B75BD,
+        )
+        
+        embed.add_field(
+            name="📋 What You'll Need",
+            value="• Proof of purchase (screenshot/receipt)\n• Package details\n• Any additional requirements",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💡 Tips for Faster Processing",
+            value="• Ensure proof of purchase is clear and readable\n• Include your username/email if not visible\n• Be specific about which package you purchased",
+            inline=False
+        )
+        
+        embed.set_footer(text="Professional Package Claims • We're here to help!")
+    else:
+        embed = discord.Embed(
+            title="📦 .pixel Package Claims - Coming Soon!",
+            description=(
+                "🎉 **Exciting News!** Our packages are launching very soon!\n\n"
+                "🚀 **What's Happening?**\n"
+                "• Our team is putting the final touches on amazing packages\n"
+                "• We're ensuring everything is perfect for you\n"
+                "• Packages will be available in just a few hours\n\n"
+                "⏰ **Stay Tuned!**\n"
+                "• Prepare your proof of purchase for when we launch\n"
+                "• Join our community to get notified first\n"
+                "• The wait will be worth it - our packages are going to be incredible!\n\n"
+                "**We appreciate your patience!** 🙏"
+            ),
+            color=0xFFA500,
+        )
+        
+        embed.add_field(
+            name="⏰ Launch Status",
+            value="• Packages launching in a few hours\n• Final preparations in progress\n• Stay tuned for the announcement",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎁 What to Expect",
+            value="• Professional package claiming system\n• Quick and efficient processing\n• Secure verification process\n• Friendly support team",
+            inline=False
+        )
+        
+        embed.set_footer(text="Professional Package Claims • Coming Soon!")
     
     # Send the embed with buttons
-    await ctx.send(embed=embed, view=PackageClaimView())
+    view = PackageClaimView()
+    if not PACKAGE_CLAIM_ENABLED:
+        # Disable the button when packages aren't available
+        for child in view.children:
+            if isinstance(child, discord.ui.Button):
+                child.disabled = True
+                child.label = "Packages Coming Soon"
+                child.style = discord.ButtonStyle.secondary
+    await ctx.send(embed=embed, view=view)
 
 @bot.command(name='disable-package-claims')
 async def disable_package_claims(ctx):
@@ -3615,43 +3649,83 @@ async def slash_create_package_claim_embed(interaction: discord.Interaction):
         return
     
     # Create the main package claim embed
-    embed = discord.Embed(
-        title="📦 .pixel Package Claims",
-        description=(
-            "Ready to claim your purchased package? We're here to help! \n\n"
-            "🎁 **Package Claim Process**\n\n"
-            "• **Easy Claim Process**: Simple and straightforward package claiming\n"
-            "• **Professional Support**: Our team will assist you with your claim\n"
-            "• **Quick Processing**: We prioritize your package claims\n"
-            "• **Secure Verification**: We ensure your purchase is verified\n"
-            "• **Friendly Service**: Professional and helpful staff\n\n"
-            "**Ready to claim your package?** \n\nClick the button below to start your package claim process."
-        ),
-        color=0x1B75BD,
-    )
-    
-    embed.add_field(
-        name="📋 What You'll Need",
-        value="• Proof of purchase (screenshot/receipt)\n• Package details\n• Any additional requirements",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="⏱️ Processing Time",
-        value="• Standard processing: 1-2 hours\n• Priority processing available",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="💡 Tips for Faster Processing",
-        value="• Ensure proof of purchase is clear and readable\n• Include your username/email if not visible\n• Be specific about which package you purchased",
-        inline=False
-    )
-    
-    embed.set_footer(text="Professional Package Claims • We're here to help!")
+    if PACKAGE_CLAIM_ENABLED:
+        embed = discord.Embed(
+            title="📦 .pixel Package Claims",
+            description=(
+                "Ready to claim your purchased package? We're here to help! \n\n"
+                "🎁 **Package Claim Process**\n\n"
+                "• **Easy Claim Process**: Simple and straightforward package claiming\n"
+                "• **Professional Support**: Our team will assist you with your claim\n"
+                "• **Quick Processing**: We prioritize your package claims\n"
+                "• **Secure Verification**: We ensure your purchase is verified\n"
+                "• **Friendly Service**: Professional and helpful staff\n\n"
+                "**Ready to claim your package?** \n\nClick the button below to start your package claim process."
+            ),
+            color=0x1B75BD,
+        )
+        
+        embed.add_field(
+            name="📋 What You'll Need",
+            value="• Proof of purchase (screenshot/receipt)\n• Package details\n• Any additional requirements",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="⏱️ Processing Time",
+            value="• Standard processing: 1-2 hours\n• Priority processing available",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💡 Tips for Faster Processing",
+            value="• Ensure proof of purchase is clear and readable\n• Include your username/email if not visible\n• Be specific about which package you purchased",
+            inline=False
+        )
+        
+        embed.set_footer(text="Professional Package Claims • We're here to help!")
+    else:
+        embed = discord.Embed(
+            title="📦 .pixel Package Claims - Coming Soon!",
+            description=(
+                "🎉 **Exciting News!** Our packages are launching very soon!\n\n"
+                "🚀 **What's Happening?**\n"
+                "• Our team is putting the final touches on amazing packages\n"
+                "• We're ensuring everything is perfect for you\n"
+                "• Packages will be available in just a few hours\n\n"
+                "⏰ **Stay Tuned!**\n"
+                "• Prepare your proof of purchase for when we launch\n"
+                "• Join our community to get notified first\n"
+                "• The wait will be worth it - our packages are going to be incredible!\n\n"
+                "**We appreciate your patience!** 🙏"
+            ),
+            color=0xFFA500,
+        )
+        
+        embed.add_field(
+            name="⏰ Launch Status",
+            value="• Packages launching in a few hours\n• Final preparations in progress\n• Stay tuned for the announcement",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🎁 What to Expect",
+            value="• Professional package claiming system\n• Quick and efficient processing\n• Secure verification process\n• Friendly support team",
+            inline=False
+        )
+        
+        embed.set_footer(text="Professional Package Claims • Coming Soon!")
     
     # Send the embed with buttons
-    await interaction.response.send_message(embed=embed, view=PackageClaimView())
+    view = PackageClaimView()
+    if not PACKAGE_CLAIM_ENABLED:
+        # Disable the button when packages aren't available
+        for child in view.children:
+            if isinstance(child, discord.ui.Button):
+                child.disabled = True
+                child.label = "Packages Coming Soon"
+                child.style = discord.ButtonStyle.secondary
+    await interaction.response.send_message(embed=embed, view=view)
 
 @bot.tree.command(name="disable-package-claims", description="Disable package claim functionality (role restricted)")
 async def slash_disable_package_claims(interaction: discord.Interaction):
