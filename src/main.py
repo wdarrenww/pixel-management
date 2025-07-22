@@ -3329,6 +3329,11 @@ class PackageClaimView(discord.ui.View):
             ephemeral=True
         )
     
+    @discord.ui.button(label="View Website", style=discord.ButtonStyle.link, url="https://packsforyou.carrd.co/")
+    async def view_website(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # this button opens the website in a new tab, no action needed here
+        pass
+    
     async def send_package_claim_welcome_message(self, channel, user):
         try:
             embed = discord.Embed(
@@ -3358,6 +3363,16 @@ class PackageClaimView(discord.ui.View):
             
             # Send pings first
             ping_message = f"Hey {user.mention}, our staff will be with you shortly to help with your package claim!"
+            
+            # Add management role ping
+            management_ping = ""
+            for role_id in MANAGER_ROLE_IDS:
+                role = channel.guild.get_role(role_id)
+                if role:
+                    management_ping += f"{role.mention} "
+            
+            if management_ping:
+                ping_message += f"\n\n📦 **Package Claim Notification** {management_ping}"
             
             await channel.send(ping_message)
             
