@@ -5663,6 +5663,25 @@ async def log_strike_action(striker, target, reason, strike_count):
     except Exception as e:
         print(f"Error logging strike action: {e}")
 
+@bot.tree.command(name="say", description="Make the bot say something in the channel")
+@app_commands.describe(message="The message to say (supports **bold** and *italics*)")
+async def slash_say(interaction: discord.Interaction, message: str):
+    """Make the bot say something in the channel with markdown support"""
+    # Check if user has privileged role
+    if not has_privileged_role(interaction.user):
+        await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+        return
+    
+    # Delete the interaction response since we're sending a new message
+    await interaction.response.defer(ephemeral=True)
+    
+    try:
+        # Send the message with markdown support
+        await interaction.channel.send(message)
+        await interaction.followup.send("✅ Message sent successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error sending message: {str(e)}", ephemeral=True)
+
 @bot.command(name='hue')
 async def help_usage_embed(ctx):
     """Display comprehensive usage guide for all commands"""
