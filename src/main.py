@@ -3329,10 +3329,10 @@ class PackageClaimView(discord.ui.View):
             ephemeral=True
         )
     
-    @discord.ui.button(label="View Website", style=discord.ButtonStyle.link, url="https://packsforyou.carrd.co/")
-    async def view_website(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # this button opens the website in a new tab, no action needed here
-        pass
+    def __init__(self):
+        super().__init__(timeout=None)
+        # Add the website button
+        self.add_item(discord.ui.Button(label="View Website", style=discord.ButtonStyle.link, url="https://packsforyou.carrd.co/"))
     
     async def send_package_claim_welcome_message(self, channel, user):
         try:
