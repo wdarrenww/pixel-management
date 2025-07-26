@@ -3366,10 +3366,9 @@ class PackageClaimView(discord.ui.View):
             
             # Add management role ping
             management_ping = ""
-            for role_id in MANAGER_ROLE_IDS:
-                role = channel.guild.get_role(role_id)
-                if role:
-                    management_ping += f"{role.mention} "
+            role = channel.guild.get_role(CO_EXECUTIVE_ROLE_ID)
+            if role:
+                management_ping += f"{role.mention} "
             
             if management_ping:
                 ping_message += f"\n\n📦 **Package Claim Notification** {management_ping}"
@@ -3527,7 +3526,7 @@ class PackageClaimCloseConfirmationView(discord.ui.View):
                     f"**Ticket opener:** {ticket_opener_name}\n"
                     f"**Closed by:** {interaction.user.mention}\n"
                     f"**Closed at:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n\n"
-                    f"The channel will be archived shortly."
+                    f"The channel will be deleted shortly."
                 ),
                 color=0xFF6B6B,
                 timestamp=datetime.utcnow()
@@ -3536,9 +3535,9 @@ class PackageClaimCloseConfirmationView(discord.ui.View):
             
             await channel.send(embed=embed)
             
-            # Archive the channel after a delay
+            # Delete the channel after a delay
             await asyncio.sleep(5)
-            await channel.edit(archived=True)
+            await channel.delete()
             
             await interaction.response.send_message("Package claim ticket closed successfully.", ephemeral=True)
             
