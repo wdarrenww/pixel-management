@@ -74,6 +74,7 @@ EXECUTIVE_ROLE_IDS = [
 
 HIGH_RANK_ROLE_IDS = [
     1362585427550146618,  # High rank role
+    1389024033408024647,  # Manager role
 ]
 
 # Store order details for payment logging
@@ -263,8 +264,12 @@ class ServiceSelect(discord.ui.Select):
             user = interaction.user
             
             # Check if user already has an open ticket
-            existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
-            if existing_ticket:
+            existing_unclaimed = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
+            existing_claimed = discord.utils.get(guild.channels, name=f"claimed-{user.name.lower()}")
+            existing_finished = discord.utils.get(guild.channels, name=f"finished-{user.name.lower()}")
+            
+            if existing_unclaimed or existing_claimed or existing_finished:
+                existing_ticket = existing_unclaimed or existing_claimed or existing_finished
                 await interaction.response.send_message(
                     f"You already have an open ticket: {existing_ticket.mention}",
                     ephemeral=True
@@ -487,25 +492,52 @@ class CloseConfirmationView(discord.ui.View):
             await interaction.response.send_message("You don't have permission to close tickets.", ephemeral=True)
             return
         channel = interaction.channel
-        # Send closing message
-        embed = discord.Embed(
-            title="🔒 Ticket Closing",
-            description="This ticket will be closed in 10 seconds...",
-            color=0x8E6B6B,
-            timestamp=datetime.utcnow()
-        )
-        embed.set_footer(text=".pixel Design Services")
-        await channel.send(embed=embed)
         
-        # Send DM notification to ticket opener
-        await send_ticket_closure_dm(channel, interaction.user, "design ticket")
-        
-        # Log closure
-        await self.log_ticket_close(channel, interaction.user)
-        await interaction.response.send_message("Ticket will be closed in 10 seconds.", ephemeral=True)
-        # Close after delay
-        await asyncio.sleep(10)
-        await channel.delete()
+        try:
+            # Send closing message
+            embed = discord.Embed(
+                title="🔒 Ticket Closing",
+                description="This ticket will be closed in 10 seconds...",
+                color=0x8E6B6B,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Design Services")
+            await channel.send(embed=embed)
+            
+            # Send DM notification to ticket opener
+            await send_ticket_closure_dm(channel, interaction.user, "design ticket")
+            
+            # Log closure
+            await self.log_ticket_close(channel, interaction.user)
+            await interaction.response.send_message("Ticket will be closed in 10 seconds.", ephemeral=True)
+            
+            # Close after delay
+            await asyncio.sleep(10)
+            
+            # Delete the channel with error handling
+            try:
+                await channel.delete()
+                print(f"Successfully deleted design ticket channel: {channel.name}")
+            except discord.Forbidden:
+                print(f"Permission denied when trying to delete design ticket channel: {channel.name}")
+                # Try to send a message to the channel instead
+                try:
+                    await channel.send("❌ **Error**: Unable to delete this channel due to insufficient permissions. Please contact an administrator.")
+                except:
+                    pass
+            except discord.NotFound:
+                print(f"Design ticket channel already deleted: {channel.name}")
+            except Exception as e:
+                print(f"Error deleting design ticket channel {channel.name}: {e}")
+                # Try to send a message to the channel instead
+                try:
+                    await channel.send(f"❌ **Error**: Unable to delete this channel. Error: {str(e)}")
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"Error in design ticket close process: {e}")
+            await interaction.response.send_message(f"An error occurred while closing the ticket: {str(e)}", ephemeral=True)
     
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="cancel_close")
     async def cancel_close(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1849,15 +1881,33 @@ async def close_ticket(ctx):
     if not has_privileged_role(ctx.author):
         await ctx.send("You don't have permission to close this ticket.", delete_after=5)
         return
-    embed = discord.Embed(
-        title="Ticket Closing",
-        description="This ticket will be closed in 10 seconds...",
-        color=0x8E6B6B,
-        timestamp=datetime.utcnow()
-    )
-    await ctx.send(embed=embed)
-    await asyncio.sleep(10)
-    await ctx.channel.delete()
+    
+    try:
+        embed = discord.Embed(
+            title="Ticket Closing",
+            description="This ticket will be closed in 10 seconds...",
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        await ctx.send(embed=embed)
+        await asyncio.sleep(10)
+        
+        # Delete the channel with error handling
+        try:
+            await ctx.channel.delete()
+            print(f"Successfully deleted ticket channel: {ctx.channel.name}")
+        except discord.Forbidden:
+            print(f"Permission denied when trying to delete ticket channel: {ctx.channel.name}")
+            await ctx.send("❌ **Error**: Unable to delete this channel due to insufficient permissions. Please contact an administrator.")
+        except discord.NotFound:
+            print(f"Ticket channel already deleted: {ctx.channel.name}")
+        except Exception as e:
+            print(f"Error deleting ticket channel {ctx.channel.name}: {e}")
+            await ctx.send(f"❌ **Error**: Unable to delete this channel. Error: {str(e)}")
+            
+    except Exception as e:
+        print(f"Error in close ticket command: {e}")
+        await ctx.send(f"An error occurred while closing the ticket: {str(e)}")
 
 # Error handling
 @bot.event
@@ -2096,35 +2146,37 @@ async def create_package_claim_embed(ctx):
         embed.set_footer(text="Professional Package Claims • We're here to help!")
     else:
         embed = discord.Embed(
-            title="📦 .pixel Package Claims - Coming Soon!",
+            title="📦 .pixel Package Claims - Temporarily Unavailable",
             description=(
-                "🎉 **Exciting News!** Our packages are launching very soon!\n\n"
-                "🚀 **What's Happening?**\n"
-                "• Our team is putting the final touches on amazing packages\n"
-                "• We're ensuring everything is perfect for you\n"
-                "• Packages will be available in just a few hours\n\n"
-                "⏰ **Stay Tuned!**\n"
-                "• Prepare your proof of purchase for when we launch\n"
-                "• Join our community to get notified first\n"
-                "• The wait will be worth it - our packages are going to be incredible!\n\n"
-                "**We appreciate your patience!** 🙏"
+                "**Package Orders Currently Unavailable**\n\n"
+                "We regret to inform you that we are currently unable to handle package orders at this time.\n\n"
+                "**What this means:**\n"
+                "• Package claiming functionality is temporarily suspended\n"
+                "• We are unable to process new package claims\n"
+                "• Existing package claims remain unaffected\n\n"
+                "**When will packages reopen?**\n"
+                "• Packages will reopen at a later date\n"
+                "• We will announce the reopening through our official channels\n"
+                "• Please stay tuned for updates\n\n"
+                "**We appreciate your understanding and patience.**\n"
+                "Thank you for your continued support!"
             ),
-            color=0xFFA500,
+            color=0xFF6B6B,
         )
         
         embed.add_field(
-            name="⏰ Launch Status",
-            value="• Packages launching in a few hours\n• Final preparations in progress\n• Stay tuned for the announcement",
+            name="⏰ Status Update",
+            value="• Package orders temporarily suspended\n• Reopening date to be announced\n• Stay tuned for official updates",
             inline=False
         )
         
         embed.add_field(
-            name="🎁 What to Expect",
-            value="• Professional package claiming system\n• Quick and efficient processing\n• Secure verification process\n• Friendly support team",
+            name="📞 Support",
+            value="• For urgent matters, please contact support\n• Existing claims will be processed as usual\n• We apologize for any inconvenience",
             inline=False
         )
         
-        embed.set_footer(text="Professional Package Claims • Coming Soon!")
+        embed.set_footer(text="Professional Package Claims • Temporarily Unavailable")
     
     # Send the embed with buttons
     view = PackageClaimView()
@@ -2133,7 +2185,7 @@ async def create_package_claim_embed(ctx):
         for child in view.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = True
-                child.label = "Packages Coming Soon"
+                child.label = "Packages Temporarily Unavailable"
                 child.style = discord.ButtonStyle.secondary
     await ctx.send(embed=embed, view=view)
 
@@ -2167,7 +2219,7 @@ async def disable_package_claims(ctx):
             f"Package claim functionality has been **disabled** by {ctx.author.mention}.\n\n"
             "**What this means:**\n"
             "• Users can no longer create package claim tickets\n"
-            "• The 'Claim Package' button will show a 'coming soon' message\n"
+            "• The 'Claim Package' button will show a 'temporarily unavailable' message\n"
             "• Existing tickets remain unaffected\n\n"
             "**To re-enable:** Use `-enable-package-claims` or `/enable-package-claims`"
         ),
@@ -2757,8 +2809,12 @@ class SupportTypeSelect(discord.ui.Select):
             user = interaction.user
             
             # Check if user already has an open support ticket
-            existing_ticket = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
-            if existing_ticket:
+            existing_unclaimed = discord.utils.get(guild.channels, name=f"unclaimed-{user.name.lower()}")
+            existing_claimed = discord.utils.get(guild.channels, name=f"claimed-{user.name.lower()}")
+            existing_resolved = discord.utils.get(guild.channels, name=f"resolved-{user.name.lower()}")
+            
+            if existing_unclaimed or existing_claimed or existing_resolved:
+                existing_ticket = existing_unclaimed or existing_claimed or existing_resolved
                 await interaction.response.send_message(
                     f"You already have an open ticket: {existing_ticket.mention}",
                     ephemeral=True
@@ -3010,26 +3066,51 @@ class SupportCloseConfirmationView(discord.ui.View):
         
         channel = interaction.channel
         
-        # Send closing message
-        embed = discord.Embed(
-            title="🔒 Support Ticket Closing",
-            description="This support ticket will be closed in 10 seconds...",
-            color=0x8E6B6B,
-            timestamp=datetime.utcnow()
-        )
-        embed.set_footer(text=".pixel Support")
-        await channel.send(embed=embed)
-        
-        # Send DM notification to ticket opener
-        await send_ticket_closure_dm(channel, interaction.user, "support ticket")
-        
-        # Log closure
-        await self.log_support_ticket_close(channel, interaction.user)
-        await interaction.response.send_message("Support ticket will be closed in 10 seconds.", ephemeral=True)
-        
-        # Close after delay
-        await asyncio.sleep(10)
-        await channel.delete()
+        try:
+            # Send closing message
+            embed = discord.Embed(
+                title="🔒 Support Ticket Closing",
+                description="This support ticket will be closed in 10 seconds...",
+                color=0x8E6B6B,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Support")
+            await channel.send(embed=embed)
+            
+            # Send DM notification to ticket opener
+            await send_ticket_closure_dm(channel, interaction.user, "support ticket")
+            
+            # Log closure
+            await self.log_support_ticket_close(channel, interaction.user)
+            await interaction.response.send_message("Support ticket will be closed in 10 seconds.", ephemeral=True)
+            
+            # Close after delay
+            await asyncio.sleep(10)
+            
+            # Delete the channel with error handling
+            try:
+                await channel.delete()
+                print(f"Successfully deleted support ticket channel: {channel.name}")
+            except discord.Forbidden:
+                print(f"Permission denied when trying to delete support ticket channel: {channel.name}")
+                # Try to send a message to the channel instead
+                try:
+                    await channel.send("❌ **Error**: Unable to delete this channel due to insufficient permissions. Please contact an administrator.")
+                except:
+                    pass
+            except discord.NotFound:
+                print(f"Support ticket channel already deleted: {channel.name}")
+            except Exception as e:
+                print(f"Error deleting support ticket channel {channel.name}: {e}")
+                # Try to send a message to the channel instead
+                try:
+                    await channel.send(f"❌ **Error**: Unable to delete this channel. Error: {str(e)}")
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"Error in support ticket close process: {e}")
+            await interaction.response.send_message(f"An error occurred while closing the support ticket: {str(e)}", ephemeral=True)
     
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="cancel_close_support")
     async def cancel_close_support(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -3257,22 +3338,23 @@ class PackageClaimView(discord.ui.View):
             embed = discord.Embed(
                 title="📦 Package Claims Temporarily Unavailable",
                 description=(
-                    "We're excited to announce that our packages are launching very soon! 🎉\n\n"
-                    "**What's happening?**\n"
-                    "• Our team is putting the final touches on the packages\n"
-                    "• We're ensuring everything is perfect for you\n"
-                    "• The packages will be available in just a few hours\n\n"
-                    "**What can you do?**\n"
-                    "• Stay tuned for the official announcement\n"
-                    "• Prepare your proof of purchase for when we launch\n"
-                    "• Join our community to get notified first\n\n"
-                    "**We appreciate your patience!** 🙏\n"
-                    "The wait will be worth it - our packages are going to be amazing!"
+                    "**Package Orders Currently Unavailable**\n\n"
+                    "We regret to inform you that we are currently unable to handle package orders at this time.\n\n"
+                    "**What this means:**\n"
+                    "• Package claiming functionality is temporarily suspended\n"
+                    "• We are unable to process new package claims\n"
+                    "• Existing package claims remain unaffected\n\n"
+                    "**When will packages reopen?**\n"
+                    "• Packages will reopen at a later date\n"
+                    "• We will announce the reopening through our official channels\n"
+                    "• Please stay tuned for updates\n\n"
+                    "**We appreciate your understanding and patience.**\n"
+                    "Thank you for your continued support!"
                 ),
-                color=0xFFA500,
+                color=0xFF6B6B,
                 timestamp=datetime.utcnow()
             )
-            embed.set_footer(text=".pixel Package Claims • Coming Soon!")
+            embed.set_footer(text=".pixel Package Claims • Temporarily Unavailable")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -3537,11 +3619,32 @@ class PackageClaimCloseConfirmationView(discord.ui.View):
             
             # Delete the channel after a delay
             await asyncio.sleep(5)
-            await channel.delete()
+            
+            # Delete the channel with error handling
+            try:
+                await channel.delete()
+                print(f"Successfully deleted package claim ticket channel: {channel.name}")
+            except discord.Forbidden:
+                print(f"Permission denied when trying to delete package claim ticket channel: {channel.name}")
+                # Try to send a message to the channel instead
+                try:
+                    await channel.send("❌ **Error**: Unable to delete this channel due to insufficient permissions. Please contact an administrator.")
+                except:
+                    pass
+            except discord.NotFound:
+                print(f"Package claim ticket channel already deleted: {channel.name}")
+            except Exception as e:
+                print(f"Error deleting package claim ticket channel {channel.name}: {e}")
+                # Try to send a message to the channel instead
+                try:
+                    await channel.send(f"❌ **Error**: Unable to delete this channel. Error: {str(e)}")
+                except:
+                    pass
             
             await interaction.response.send_message("Package claim ticket closed successfully.", ephemeral=True)
             
         except Exception as e:
+            print(f"Error in package claim ticket close process: {e}")
             await interaction.response.send_message(f"Error closing ticket: {e}", ephemeral=True)
     
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="cancel_close_package_claim")
@@ -3700,35 +3803,37 @@ async def slash_create_package_claim_embed(interaction: discord.Interaction):
         embed.set_footer(text="Professional Package Claims • We're here to help!")
     else:
         embed = discord.Embed(
-            title="📦 .pixel Package Claims - Coming Soon!",
+            title="📦 .pixel Package Claims - Temporarily Unavailable",
             description=(
-                "🎉 **Exciting News!** Our packages are launching very soon!\n\n"
-                "🚀 **What's Happening?**\n"
-                "• Our team is putting the final touches on amazing packages\n"
-                "• We're ensuring everything is perfect for you\n"
-                "• Packages will be available in just a few hours\n\n"
-                "⏰ **Stay Tuned!**\n"
-                "• Prepare your proof of purchase for when we launch\n"
-                "• Join our community to get notified first\n"
-                "• The wait will be worth it - our packages are going to be incredible!\n\n"
-                "**We appreciate your patience!** 🙏"
+                "**Package Orders Currently Unavailable**\n\n"
+                "We regret to inform you that we are currently unable to handle package orders at this time.\n\n"
+                "**What this means:**\n"
+                "• Package claiming functionality is temporarily suspended\n"
+                "• We are unable to process new package claims\n"
+                "• Existing package claims remain unaffected\n\n"
+                "**When will packages reopen?**\n"
+                "• Packages will reopen at a later date\n"
+                "• We will announce the reopening through our official channels\n"
+                "• Please stay tuned for updates\n\n"
+                "**We appreciate your understanding and patience.**\n"
+                "Thank you for your continued support!"
             ),
-            color=0xFFA500,
+            color=0xFF6B6B,
         )
         
         embed.add_field(
-            name="⏰ Launch Status",
-            value="• Packages launching in a few hours\n• Final preparations in progress\n• Stay tuned for the announcement",
+            name="⏰ Status Update",
+            value="• Package orders temporarily suspended\n• Reopening date to be announced\n• Stay tuned for official updates",
             inline=False
         )
         
         embed.add_field(
-            name="🎁 What to Expect",
-            value="• Professional package claiming system\n• Quick and efficient processing\n• Secure verification process\n• Friendly support team",
+            name="📞 Support",
+            value="• For urgent matters, please contact support\n• Existing claims will be processed as usual\n• We apologize for any inconvenience",
             inline=False
         )
         
-        embed.set_footer(text="Professional Package Claims • Coming Soon!")
+        embed.set_footer(text="Professional Package Claims • Temporarily Unavailable")
     
     # Send the embed with buttons
     view = PackageClaimView()
@@ -3737,7 +3842,7 @@ async def slash_create_package_claim_embed(interaction: discord.Interaction):
         for child in view.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = True
-                child.label = "Packages Coming Soon"
+                child.label = "Packages Temporarily Unavailable"
                 child.style = discord.ButtonStyle.secondary
     await interaction.response.send_message(embed=embed, view=view)
 
@@ -3766,7 +3871,7 @@ async def slash_disable_package_claims(interaction: discord.Interaction):
             f"Package claim functionality has been **disabled** by {interaction.user.mention}.\n\n"
             "**What this means:**\n"
             "• Users can no longer create package claim tickets\n"
-            "• The 'Claim Package' button will show a 'coming soon' message\n"
+            "• The 'Claim Package' button will show a 'temporarily unavailable' message\n"
             "• Existing tickets remain unaffected\n\n"
             "**To re-enable:** Use `-enable-package-claims` or `/enable-package-claims`"
         ),
@@ -5132,6 +5237,162 @@ async def slash_role_info(interaction: discord.Interaction, user: discord.Member
     embed.set_footer(text=".pixel Management • Role System")
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+@bot.tree.command(name="activity-check", description="Check activity of designer and support role members (executives, HR, and managers only)")
+@app_commands.describe(days="Number of days to check activity for (default: 7)")
+async def activity_check(interaction: discord.Interaction, days: int = 7):
+    """Check activity of designer and support role members over specified days"""
+    # Check if user has executive, HR, or manager role
+    if not (has_executive_role(interaction.user) or has_high_rank_role(interaction.user) or has_manager_role(interaction.user)):
+        await interaction.response.send_message("You don't have permission to use this command. Only executives, HR, and managers can use this command.", ephemeral=True)
+        return
+    
+    # Validate days parameter
+    if days < 1 or days > 365:
+        await interaction.response.send_message("Please specify a number of days between 1 and 365.", ephemeral=True)
+        return
+    
+    await interaction.response.defer(ephemeral=True)
+    
+    try:
+        guild = interaction.guild
+        cutoff_time = datetime.utcnow() - timedelta(days=days)
+        
+        # Get all members with designer or support roles
+        target_members = []
+        all_role_ids = DESIGNER_ROLE_IDS + SUPPORT_ROLE_IDS
+        
+        for member in guild.members:
+            member_role_ids = [role.id for role in member.roles]
+            if any(role_id in member_role_ids for role_id in all_role_ids):
+                target_members.append(member)
+        
+        if not target_members:
+            embed = discord.Embed(
+                title="No Target Members Found",
+                description="No members with designer or support roles were found in this server.",
+                color=0xFFA500,
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text=".pixel Design Services • Activity Check")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            return
+        
+        # Check message activity for each member
+        inactive_members = []
+        total_messages = 0
+        
+        for member in target_members:
+            message_count = 0
+            
+            # Check messages in all text channels
+            for channel in guild.text_channels:
+                try:
+                    # Check if bot has permission to read message history
+                    if not channel.permissions_for(guild.me).read_message_history:
+                        continue
+                    
+                    # Count messages from this member since cutoff time
+                    async for message in channel.history(limit=None, after=cutoff_time):
+                        if message.author.id == member.id:
+                            message_count += 1
+                            total_messages += 1
+                            
+                            # Stop counting if they have more than 2 messages
+                            if message_count > 2:
+                                break
+                    
+                    # If member already has more than 2 messages, no need to check other channels
+                    if message_count > 2:
+                        break
+                        
+                except discord.Forbidden:
+                    # Skip channels where bot doesn't have permission
+                    continue
+                except Exception as e:
+                    print(f"Error checking messages in {channel.name}: {e}")
+                    continue
+            
+            # If member has 2 or fewer messages, add to inactive list
+            if message_count <= 2:
+                inactive_members.append({
+                    'member': member,
+                    'message_count': message_count,
+                    'roles': [role.name for role in member.roles if role.id in all_role_ids]
+                })
+        
+        # Create embed with results
+        embed = discord.Embed(
+            title="📊 Activity Check Results",
+            description=f"Activity check for the last **{days} days**",
+            color=0x1B75BD,
+            timestamp=datetime.utcnow()
+        )
+        
+        embed.add_field(
+            name="📈 Overall Statistics",
+            value=f"• **Total members checked:** {len(target_members)}\n"
+                  f"• **Total messages sent:** {total_messages}\n"
+                  f"• **Inactive members (≤2 messages):** {len(inactive_members)}",
+            inline=False
+        )
+        
+        if inactive_members:
+            # Sort by message count (ascending)
+            inactive_members.sort(key=lambda x: x['message_count'])
+            
+            # Create list of inactive members
+            inactive_list = []
+            for i, data in enumerate(inactive_members[:20], 1):  # Limit to 20 for embed
+                member = data['member']
+                message_count = data['message_count']
+                roles = ', '.join(data['roles'])
+                
+                inactive_list.append(
+                    f"**{i}.** {member.mention} (`{member.id}`)\n"
+                    f"   • Messages: {message_count}\n"
+                    f"   • Roles: {roles}"
+                )
+            
+            inactive_text = "\n\n".join(inactive_list)
+            
+            if len(inactive_members) > 20:
+                inactive_text += f"\n\n*...and {len(inactive_members) - 20} more members*"
+            
+            embed.add_field(
+                name=f"⚠️ Inactive Members ({len(inactive_members)})",
+                value=inactive_text,
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="✅ All Members Active",
+                value="All designer and support role members have sent more than 2 messages in the specified time period.",
+                inline=False
+            )
+        
+        embed.add_field(
+            name="📋 Check Details",
+            value=f"• **Time period:** {days} days\n"
+                  f"• **Cutoff date:** {cutoff_time.strftime('%Y-%m-%d %H:%M UTC')}\n"
+                  f"• **Checked by:** {interaction.user.mention}",
+            inline=False
+        )
+        
+        embed.set_footer(text=".pixel Design Services • Activity Check")
+        
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        
+    except Exception as e:
+        error_embed = discord.Embed(
+            title="❌ Error During Activity Check",
+            description=f"An error occurred while performing the activity check:\n```{str(e)}```",
+            color=0x8E6B6B,
+            timestamp=datetime.utcnow()
+        )
+        error_embed.set_footer(text=".pixel Design Services • Activity Check")
+        await interaction.followup.send(embed=error_embed, ephemeral=True)
+
 
 @bot.tree.command(name="role-hierarchy", description="Show the complete role hierarchy (management only)")
 async def slash_role_hierarchy(interaction: discord.Interaction):
