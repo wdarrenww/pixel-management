@@ -3330,6 +3330,13 @@ class SupportTicketOrderView(discord.ui.View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class PackageClaimView(discord.ui.View):
+    
+    def __init__(self):
+        super().__init__(timeout=None)
+        # Add the website button
+        self.add_item(discord.ui.Button(label="View Website", style=discord.ButtonStyle.link, url="https://packsforyou.carrd.co/"))
+    
+    
     @discord.ui.button(label="Claim Package", style=discord.ButtonStyle.primary, custom_id="claim_package")
     async def claim_package(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Check if package claims are enabled
@@ -3409,11 +3416,6 @@ class PackageClaimView(discord.ui.View):
             f"Your package claim ticket has been created: {ticket_channel.mention}!",
             ephemeral=True
         )
-    
-    def __init__(self):
-        super().__init__(timeout=None)
-        # Add the website button
-        self.add_item(discord.ui.Button(label="View Website", style=discord.ButtonStyle.link, url="https://packsforyou.carrd.co/"))
     
     async def send_package_claim_welcome_message(self, channel, user):
         try:
