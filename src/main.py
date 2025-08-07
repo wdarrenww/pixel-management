@@ -61,11 +61,13 @@ DESIGNER_ROLE_IDS = [
     1362585427168592016,  # New designer role
     1362585427168592015,  # New designer role
     1362585427135168653,  # New designer role
-    1362585427135168652   # New designer role
+    1362585427135168652,  # New designer role
+    1400041445632770078,  # New designer role
 ]
 
 SUPPORT_ROLE_IDS = [
     1362585427168592022,  # Support role
+    1400043502485901342
 ]
 
 EXECUTIVE_ROLE_IDS = [
