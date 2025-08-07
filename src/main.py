@@ -3330,9 +3330,6 @@ class SupportTicketOrderView(discord.ui.View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class PackageClaimView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-    
     @discord.ui.button(label="Claim Package", style=discord.ButtonStyle.primary, custom_id="claim_package")
     async def claim_package(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Check if package claims are enabled
